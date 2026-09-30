@@ -207,6 +207,7 @@ public sealed record Product
         ChannelToken = Read.String(product.Field("channel_token"));
         ChannelReference = Read.String(product.Field("channel_reference"));
         Name = Read.String(product.Field("name"));
+        Image = Read.OptionalString(product.Field("image"));
         Type = Read.String(product.Field("type"));
         Amount = Read.String(product.Field("amount"));
         Currency = Read.String(product.Field("currency"));
@@ -224,6 +225,9 @@ public sealed record Product
     public string ChannelReference { get; }
 
     public string Name { get; }
+
+    /// <summary>The address of the picture the checkout shows it with; null when it has none.</summary>
+    public string? Image { get; }
 
     /// <summary>simple or recurring.</summary>
     public string Type { get; }

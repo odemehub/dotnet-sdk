@@ -81,6 +81,9 @@ public sealed class OrderItem
     /// <summary>Left out, the product's own name is shown.</summary>
     public string? Name { get; init; }
 
+    /// <summary>The https address of the picture shown beside the line at checkout. Left out, the product's own picture is shown.</summary>
+    public string? Image { get; init; }
+
     /// <summary>Left out, the line is for one.</summary>
     public int? Quantity { get; init; }
 
@@ -95,6 +98,7 @@ public sealed class OrderItem
         return Fields.Said(
             ("channel_reference", ChannelReference),
             ("name", Name),
+            ("image", Image),
             ("quantity", Quantity),
             ("unit_amount", UnitAmount),
             ("tax_rate", TaxRate));
@@ -138,6 +142,12 @@ public sealed class SaveProduct : ChannelMessage
     /// <summary>Whether it is on sale. Left out, it is.</summary>
     public bool? IsActive { get; init; }
 
+    /// <summary>
+    /// The https address of the picture the checkout shows it with. Left out,
+    /// the product keeps the picture it has; an empty string takes it off.
+    /// </summary>
+    public string? Image { get; init; }
+
     internal override string Path => "save-product";
 
     internal override JsonObject ToBody(string channelToken)
@@ -147,6 +157,7 @@ public sealed class SaveProduct : ChannelMessage
                 ("channel_token", Channel(channelToken)),
                 ("channel_reference", ChannelReference),
                 ("name", Name),
+                ("image", Image),
                 ("type", Type),
                 ("amount", Amount),
                 ("currency", Currency),

@@ -145,6 +145,7 @@ var product = await client.SaveProductAsync(new SaveProduct
     Type = "simple",          // simple | recurring
     Amount = "450.00",
     TaxRate = "20",           // fiyatın içindeki KDV oranı
+    Image = "https://magazam.com/img/kahve-makinesi.jpg", // ödeme sayfasında gösterilir
 });
 
 await client.SaveProductAsync(new SaveProduct
@@ -158,7 +159,7 @@ await client.SaveProductAsync(new SaveProduct
 });
 ```
 
-Aynı kanalda aynı referans aynı üründür: tekrar gönderirseniz ikinci ürün açılmaz, mevcut olan güncellenir. `Currency` verilmezse TRY, `IsActive` verilmezse `true` kabul edilir. Ürün silinmez; `IsActive = false` ile satışa kapatılır.
+Aynı kanalda aynı referans aynı üründür: tekrar gönderirseniz ikinci ürün açılmaz, mevcut olan güncellenir. `Currency` verilmezse TRY, `IsActive` verilmezse `true` kabul edilir. Ürün silinmez; `IsActive = false` ile satışa kapatılır. `Image` yalnızca `https://` adres alır; göndermezseniz ürün mevcut görselini (panelden yüklenmiş olanı da) korur, boş metin gönderirseniz görsel kaldırılır.
 
 Ödeme istekleri ürünü hiçbir zaman değiştirmez; ürünün tek yazıldığı yer bu çağrı ve panel.
 
@@ -177,20 +178,26 @@ var order = await client.OrderPaymentAsync(new OrderPayment
     [
         new OrderItem { ChannelReference = "KAHVE-MAKINESI" },
         new OrderItem { ChannelReference = "KAHVE-500G", Quantity = 2, UnitAmount = "180.00" },
-        new OrderItem { ChannelReference = "HEDIYE-PAKETI", Name = "Hediye paketi", UnitAmount = "25.00" },
+        new OrderItem
+        {
+            ChannelReference = "HEDIYE-PAKETI",
+            Name = "Hediye paketi",
+            UnitAmount = "25.00",
+            Image = "https://magazam.com/img/hediye-paketi.jpg",
+        },
     ],
 });
 
 return Results.Redirect(order.CheckoutUrl);
 ```
 
-Sipariş tutarını göndermezsiniz; geçit kalemleri toplar ve `order.Amount` olarak döner. Bir kalemin boş bıraktığı ad, fiyat ve KDV oranı kayıtlı üründen gelir; kalemde verdiğiniz değerler yalnızca o sipariş için geçerlidir, ürünü değiştirmez. Kayıtlı olmayan bir referansla da kalem gönderebilirsiniz, ama o zaman `Name` ve `UnitAmount` zorunludur.
+Sipariş tutarını göndermezsiniz; geçit kalemleri toplar ve `order.Amount` olarak döner. Bir kalemin boş bıraktığı ad, fiyat ve KDV oranı kayıtlı üründen gelir; kalemde verdiğiniz değerler yalnızca o sipariş için geçerlidir, ürünü değiştirmez. Kayıtlı olmayan bir referansla da kalem gönderebilirsiniz, ama o zaman `Name` ve `UnitAmount` zorunludur. Kalemin `Image` alanı (`https://` adres) ödeme sayfasında kalemin yanında gösterilir; verilmezse kayıtlı ürünün görseli kullanılır, ürün kayıtlı değilse kalem görselsiz görünür.
 
 Ödeme tamamlanınca müşteri, 3D'dekiyle aynı biçimde `SuccessUrl` adresinize döner: aynı üç alan gelir, sonucu yine `RetrievePaymentAsync()` ile sorarsınız. Müşteri ödeme sayfasında karttan kaynaklı bir hata alırsa size dönmez, sayfada kalıp başka kartla dener.
 
 ## Abonelikler
 
-Müşteriden dönem dönem tahsilat yapmak için abonelik açarsınız. Neye abone olunduğu bir ya da birkaç **abonelik ürünüdür** (`Type = "recurring"`), sizdeki referanslarıyla adlandırılır; fiyatı, para birimini ve dönemini ürün taşır. Aynı aboneliğe konan ürünlerin dönemi ve para birimi aynı olmalıdır.
+Müşteriden dönem dönem tahsilat yapmak için abonelik açarsınız. Neye abone olunduğu bir ya da birkaç **abonelik ürünüdür** (`Type = "recurring"`), sizdeki referanslarıyla adlandırılır; fiyatı, para birimini ve dönemini ürün taşır. Aynı aboneliğe konan ürünlerin dönemi ve para birimi aynı olmalıdır. Bir kaleme `Image` (`https://` adres) verirseniz ödeme sayfasında ürünün görseli yerine o gösterilir.
 
 ```csharp
 var subscription = await client.SubscriptionPaymentAsync(new SubscriptionPayment

@@ -79,12 +79,16 @@ public sealed class SubscriptionItem
     /// </summary>
     public string? UnitAmount { get; init; }
 
+    /// <summary>The https address of the picture shown at checkout for this line. Left out, the product's own picture is shown.</summary>
+    public string? Image { get; init; }
+
     internal JsonObject ToBody()
     {
         return Fields.Said(
             ("channel_reference", ChannelReference),
             ("quantity", Quantity),
-            ("unit_amount", UnitAmount));
+            ("unit_amount", UnitAmount),
+            ("image", Image));
     }
 }
 

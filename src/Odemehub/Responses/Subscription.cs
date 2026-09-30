@@ -113,6 +113,7 @@ public sealed record SubscriptionItem
     {
         ChannelReference = Read.String(item.Field("channel_reference"));
         Name = Read.String(item.Field("name"));
+        Image = Read.OptionalString(item.Field("image"));
         Quantity = Read.Int(item.Field("quantity"));
         UnitAmount = Read.String(item.Field("unit_amount"));
         TaxRate = Read.OptionalString(item.Field("tax_rate"));
@@ -122,6 +123,9 @@ public sealed record SubscriptionItem
     public string ChannelReference { get; }
 
     public string Name { get; }
+
+    /// <summary>The picture shown for the line: the one named when the subscription was opened, or else the product's; null when neither has one.</summary>
+    public string? Image { get; }
 
     public int Quantity { get; }
 
