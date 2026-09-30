@@ -48,7 +48,7 @@ public sealed record Subscription
     /// <summary>Where it stands: pending, active, past_due or cancelled.</summary>
     public string Status { get; }
 
-    /// <summary>How often a period comes round: monthly or yearly.</summary>
+    /// <summary>How often a period comes round: monthly or annually.</summary>
     public string Period { get; }
 
     /// <summary>What the period it is on costs, with the kurus behind a point.</summary>

@@ -129,7 +129,7 @@ public sealed class SaveProduct : ChannelMessage
     /// <summary>The tax included in the price, as a percentage, e.g. "20".</summary>
     public required string TaxRate { get; init; }
 
-    /// <summary>How often a recurring product comes round: "monthly" or "yearly". Only a recurring product has one.</summary>
+    /// <summary>How often a recurring product comes round: "monthly" or "annually". Only a recurring product has one.</summary>
     public string? Period { get; init; }
 
     /// <summary>Three letters, e.g. TRY. Left out, the gateway takes the lira.</summary>

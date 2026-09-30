@@ -154,7 +154,7 @@ await client.SaveProductAsync(new SaveProduct
     Type = "recurring",
     Amount = "149.90",
     TaxRate = "20",
-    Period = "monthly",       // monthly | yearly — yalnız recurring için zorunlu
+    Period = "monthly",       // monthly | annually — yalnız recurring için zorunlu
 });
 ```
 

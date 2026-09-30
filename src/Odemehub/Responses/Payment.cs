@@ -236,7 +236,7 @@ public sealed record Product
     /// <summary>The tax included in the price, as a percentage.</summary>
     public string TaxRate { get; }
 
-    /// <summary>monthly or yearly for a recurring product; null for a simple one.</summary>
+    /// <summary>monthly or annually for a recurring product; null for a simple one.</summary>
     public string? Period { get; }
 
     /// <summary>Whether it is on sale.</summary>
