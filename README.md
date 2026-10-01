@@ -21,7 +21,7 @@ using Odemehub;
 
 var client = new Client(new Options
 {
-    BaseUrl = "https://odeme.gurmehub.com",
+    BaseUrl = "https://app.odemehub.com",
     Team = "4829301756",                                   // Çalışma Alanı Kimliğiniz
     ChannelToken = "6f1c2e7a-4b3d-4c8e-9a61-2f5d7b0c3e14", // müşterinin size ulaştığı kanal
     ApiKey = Environment.GetEnvironmentVariable("ODEMEHUB_API_KEY")!,
