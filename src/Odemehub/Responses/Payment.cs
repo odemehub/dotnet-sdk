@@ -149,52 +149,6 @@ public sealed record GiveBack : Payment
 }
 
 /// <summary>
-/// An order opened to be paid on the gateway's own page.
-/// </summary>
-public sealed record OrderPayment
-{
-    internal OrderPayment(JsonElement body)
-    {
-        var order = body.Field("order");
-
-        Result = new Result(body);
-        Token = Read.String(order.Field("token"));
-        ChannelToken = Read.String(order.Field("channel_token"));
-        ChannelReference = Read.String(order.Field("channel_reference"));
-        Amount = Read.String(order.Field("amount"));
-        Currency = Read.String(order.Field("currency"));
-        Status = Read.String(order.Field("status"));
-        CheckoutUrl = Read.String(order.Field("checkout_url"));
-        CustomerChannelReference = Read.String(body.Field("customer").Field("channel_reference"));
-    }
-
-    public Result Result { get; }
-
-    /// <summary>The order's token in the gateway.</summary>
-    public string Token { get; }
-
-    /// <summary>The channel the order was opened on.</summary>
-    public string ChannelToken { get; }
-
-    /// <summary>The number the order is known by in the calling system.</summary>
-    public string ChannelReference { get; }
-
-    /// <summary>What the order comes to, added up from its lines by the gateway.</summary>
-    public string Amount { get; }
-
-    public string Currency { get; }
-
-    /// <summary>Where the order stands: open until it is paid.</summary>
-    public string Status { get; }
-
-    /// <summary>Where the customer has to be sent to pay.</summary>
-    public string CheckoutUrl { get; }
-
-    /// <summary>The merchant's own key for the customer the order is for.</summary>
-    public string CustomerChannelReference { get; }
-}
-
-/// <summary>
 /// A product in the merchant's catalogue at the gateway.
 /// </summary>
 public sealed record Product

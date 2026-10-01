@@ -94,6 +94,7 @@ var payment = await client.SecurePaymentAsync(new SecurePayment
     InstallmentNumber = 1,
     Ip = ip,
     CallbackUrl = "https://magazam.com/odeme/donus",
+    WebhookUrl = "https://magazam.com/odemehub/odeme",   // isteğe bağlı, aşağıya bakın
     Customer = customer,
     Card = card,
 });
@@ -132,6 +133,52 @@ app.MapPost("/odeme/donus", async ([FromForm(Name = "transaction_token")] string
 ```
 
 Neden böyle: o POST'u bizim sunucumuz değil, müşterinin tarayıcısı gönderir; tarayıcıya imzalayacak bir sır verilemez. `successful` alanına bakıp sipariş kapatmayın — onu herkes gönderebilir; yalnız "başarısız" ipucunda gereksiz sorgudan kaçınmak için kullanın. Geçide sorduğunuz yanıt ise her zaman imzalıdır ve SDK imzayı sizin için doğrular. Başkasının işlemini sorarsanız `ValidationException` alırsınız.
+
+### Ödeme bildirimi (webhook)
+
+Müşteri bankadan sonra sekmeyi kapatırsa tarayıcı `CallbackUrl` adresinize hiç dönmez. Bunun için ödemeyi başlatırken `WebhookUrl` verin: ödeme bankada bitince (ya da müşteri bankanın sayfasını hiç açmayıp süresi dolunca) geçidin **kendi sunucusu** o adrese imzalı bir POST gönderir. Gövde `RetrievePaymentAsync()` yanıtının aynısıdır, üstüne hangi duruma gelindiğini söyleyen `Event` eklenir: `successful`, `failed` ya da `expired`. Gövdeyi abonelik bildirimindeki gibi **ham** (`byte[]`) okuyun.
+
+```csharp
+app.MapPost("/odemehub/odeme", async (HttpRequest request, Client client) =>
+{
+    using var buffer = new MemoryStream();
+    await request.Body.CopyToAsync(buffer);
+
+    Odemehub.Responses.TransactionWebhook webhook;
+
+    try
+    {
+        webhook = client.TransactionWebhook(buffer.ToArray(), request.Headers["X-Signature"].FirstOrDefault());
+    }
+    catch (SignatureException)
+    {
+        return Results.BadRequest();
+    }
+
+    if (webhook.IsSuccessful) SiparisiOdendiIsaretle(webhook.ChannelReference, webhook.TransactionToken);
+
+    return Results.Ok();
+});
+```
+
+Ödeme başlatılırken reddedilen (yanıtı anında aldığınız) ödeme için bildirim gitmez. Aynı sipariş için birden fazla deneme olabildiğinden bildirimi `TransactionToken` ile tekilleştirin. 2xx dışında bir yanıt (ya da yanıtsızlık) başarısız sayılır; bildirim 5 dakika sonra bir kez daha denenir ve ulaşmayan bildirimler panelde işlemin sayfasında listelenir. Bildirim hiç gelmezse `RetrieveTransactionsAsync()` ile sorabilirsiniz (aşağıda).
+
+### Bir referansın bütün denemeleri
+
+Elinizde yalnızca kendi sipariş numaranız varsa, o numara altında yapılmış **bütün** ödeme denemelerini — hangisi reddedildi, hangisi geçti — eskiden yeniye listeleyin:
+
+```csharp
+var attempts = await client.RetrieveTransactionsAsync(new RetrieveTransactions { ChannelReference = "SIP-10232" });
+
+foreach (var attempt in attempts.Items)
+{
+    Console.WriteLine($"{attempt.Status} {attempt.PaymentStatus} {attempt.ErrorMessage}");
+}
+
+var paid = attempts.Successful;   // geçen deneme ya da null
+```
+
+Her deneme `Token`, `Status` (`started`, `redirected_to_secure_page`, `returned_from_secure_page`, `failed`, `expired`, `successful`), `PaymentStatus` (`unpaid`, `paid`, `cancelled`, `refunded`, `partially_refunded`), `SecurityType`, `Amount` / `BaseAmount` / `Currency`, `InstallmentNumber`, `IsTest`, `ErrorCode` / `ErrorMessage`, `CreatedAt`, `CustomerChannelReference`, `Conversion` ve bağlı olduğu `OrderToken` / `SubscriptionToken` alanlarını taşır. Ödeme sayfasından açılan siparişin denemeleri de siparişin referansı altında burada görünür.
 
 ## Ürünler
 
@@ -173,6 +220,7 @@ var order = await client.OrderPaymentAsync(new OrderPayment
     ChannelReference = "SIPARIS-10233",
     SuccessUrl = "https://magazam.com/tesekkurler",
     CancelUrl = "https://magazam.com/sepet",
+    WebhookUrl = "https://magazam.com/odemehub/siparis",   // isteğe bağlı, aşağıya bakın
     Customer = customer,
     Items =
     [
@@ -188,12 +236,54 @@ var order = await client.OrderPaymentAsync(new OrderPayment
     ],
 });
 
-return Results.Redirect(order.CheckoutUrl);
+return Results.Redirect(order.CheckoutUrl!);
 ```
 
 Sipariş tutarını göndermezsiniz; geçit kalemleri toplar ve `order.Amount` olarak döner. Bir kalemin boş bıraktığı ad, fiyat ve KDV oranı kayıtlı üründen gelir; kalemde verdiğiniz değerler yalnızca o sipariş için geçerlidir, ürünü değiştirmez. Kayıtlı olmayan bir referansla da kalem gönderebilirsiniz, ama o zaman `Name` ve `UnitAmount` zorunludur. Kalemin `Image` alanı (`https://` adres) ödeme sayfasında kalemin yanında gösterilir; verilmezse kayıtlı ürünün görseli kullanılır, ürün kayıtlı değilse kalem görselsiz görünür.
 
 Ödeme tamamlanınca müşteri, 3D'dekiyle aynı biçimde `SuccessUrl` adresinize döner: aynı üç alan gelir, sonucu yine `RetrievePaymentAsync()` ile sorarsınız. Müşteri ödeme sayfasında karttan kaynaklı bir hata alırsa size dönmez, sayfada kalıp başka kartla dener.
+
+Yanıt (`Responses.Order`) siparişi bütünüyle taşır: `Token`, `ChannelReference`, `Description`, `Status` (`open` / `paid`), `Items`, `Subtotal`, `TaxAmount`, `Amount`, `Currency`, `IsTest`, `CreatedAt`, `CheckoutUrl` (ödenince `null`) ve ödeyen işlemin token'ı `TransactionToken` (açıkken `null`). Aynı nesne `RetrieveOrderAsync()` ve sipariş bildiriminde de gelir.
+
+### Sipariş bildirimi (webhook) ve sipariş sorgusu
+
+Müşteri ödedikten sonra sekmeyi kapatırsa tarayıcı `SuccessUrl` adresinize hiç dönmez. Siparişi açarken `WebhookUrl` verirseniz sipariş ödendiği an geçidin **kendi sunucusu** o adrese imzalı bir POST gönderir; gövde `event: "paid"` ve siparişin kendisidir (`TransactionToken` dolu gelir). Başarısız denemeler bildirilmez — sipariş açık kalır, müşteri sayfada yeniden dener.
+
+```csharp
+app.MapPost("/odemehub/siparis", async (HttpRequest request, Client client) =>
+{
+    using var buffer = new MemoryStream();
+    await request.Body.CopyToAsync(buffer);
+
+    Odemehub.Responses.OrderWebhook webhook;
+
+    try
+    {
+        webhook = client.OrderWebhook(buffer.ToArray(), request.Headers["X-Signature"].FirstOrDefault());
+    }
+    catch (SignatureException)
+    {
+        return Results.BadRequest();
+    }
+
+    if (webhook.IsPaid) SiparisiOdendiIsaretle(webhook.Order.ChannelReference, webhook.Order.TransactionToken);
+
+    return Results.Ok();
+});
+```
+
+Elinizde siparişin token'ı varsa durumunu her zaman kendiniz de sorabilirsiniz:
+
+```csharp
+var order = await client.RetrieveOrderAsync(new RetrieveOrder { OrderToken = token });
+
+if (order.IsPaid)
+{
+    // order.TransactionToken ile iade / iptal / RetrievePaymentAsync yapılabilir
+}
+```
+
+Siparişin bütün denemelerini (reddedilenler dahil) görmek için `RetrieveTransactionsAsync()` ile siparişin `ChannelReference` değerini sorun.
 
 ## Abonelikler
 
@@ -314,7 +404,7 @@ Gönderilen olaylar aboneliğin **durumudur**, yapılan işlem değil:
 | `cancelled` | abonelik iptal edildi; müşteri `EndsAt` tarihine kadar hizmeti almaya devam eder |
 | `ended` | ödenmiş dönem doldu, abonelik kapandı |
 
-2xx dışında bir yanıt (ya da yanıtsızlık) başarısız sayılır; bildirim 5 dakika sonra bir kez daha denenir. Ulaşmayan bildirimler panelde aboneliğin sayfasında HTTP kodu ve yanıtıyla listelenir.
+2xx dışında bir yanıt (ya da yanıtsızlık) başarısız sayılır; bildirim 5 dakika sonra bir kez daha denenir. Ulaşmayan bildirimler panelde aboneliğin sayfasında HTTP kodu ve yanıtıyla listelenir. Sipariş (`OrderWebhook()`) ve 3D ödeme (`TransactionWebhook()`) bildirimleri de aynı yöntemle gider; her biri kendi adresine, kendi okuyucusuyla.
 
 ## Ödeme hangi hesaptan geçer
 

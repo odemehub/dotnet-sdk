@@ -102,12 +102,26 @@ public sealed class SecurePayment : Payment
     /// <summary>Where the customer is posted back to, with the signed outcome, once they are done at their bank.</summary>
     public required string CallbackUrl { get; init; }
 
+    /// <summary>
+    /// Where the merchant's own server is told how the payment went, signed
+    /// the way every answer is. The customer's browser carries the word to
+    /// <see cref="CallbackUrl"/> only if the customer stays for it; this
+    /// address hears either way, including when the customer never opened the
+    /// bank's page and the payment expired.
+    /// </summary>
+    public string? WebhookUrl { get; init; }
+
     internal override string Path => "secure-payment";
 
     internal override JsonObject ToBody(string channelToken)
     {
         var body = base.ToBody(channelToken);
         body["transaction"]!["callback_url"] = CallbackUrl;
+
+        if (WebhookUrl is not null)
+        {
+            body["transaction"]!["webhook_url"] = WebhookUrl;
+        }
 
         return body;
     }

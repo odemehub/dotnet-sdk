@@ -65,9 +65,9 @@ public sealed class Client
     /// Open an order to be paid on the gateway's own page, and get back the
     /// address to send the customer to.
     /// </summary>
-    public async Task<Responses.OrderPayment> OrderPaymentAsync(Requests.OrderPayment orderPayment, CancellationToken cancellationToken = default)
+    public async Task<Order> OrderPaymentAsync(Requests.OrderPayment orderPayment, CancellationToken cancellationToken = default)
     {
-        return new Responses.OrderPayment(await SendAsync(orderPayment, cancellationToken).ConfigureAwait(false));
+        return new Order(await SendAsync(orderPayment, cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>
@@ -114,6 +114,16 @@ public sealed class Client
     /// number, and how an amount may be paid off on it. Nothing is charged and
     /// nothing is written down.
     /// </summary>
+    /// <summary>
+    /// Every attempt made under one of the merchant's own numbers on a channel,
+    /// oldest first: how many times the customer tried, which were refused and
+    /// which went through.
+    /// </summary>
+    public async Task<Transactions> RetrieveTransactionsAsync(RetrieveTransactions transactions, CancellationToken cancellationToken = default)
+    {
+        return new Transactions(await SendAsync(transactions, cancellationToken).ConfigureAwait(false));
+    }
+
     public async Task<Bin> RetrieveBinAsync(RetrieveBin retrieveBin, CancellationToken cancellationToken = default)
     {
         return new Bin(await SendAsync(retrieveBin, cancellationToken).ConfigureAwait(false));
@@ -133,6 +143,16 @@ public sealed class Client
     /// Where a subscription stands: what it is for, the period it is on and
     /// whether that period has been paid for.
     /// </summary>
+    /// <summary>
+    /// Where an order stands: what it is for, whether it has been paid and, if
+    /// so, by which payment. The one call a merchant holding nothing but the
+    /// order's token can make.
+    /// </summary>
+    public async Task<Order> RetrieveOrderAsync(RetrieveOrder order, CancellationToken cancellationToken = default)
+    {
+        return new Order(await SendAsync(order, cancellationToken).ConfigureAwait(false));
+    }
+
     public async Task<Subscription> RetrieveSubscriptionAsync(RetrieveSubscription subscription, CancellationToken cancellationToken = default)
     {
         return new Subscription(await SendAsync(subscription, cancellationToken).ConfigureAwait(false));
@@ -191,17 +211,59 @@ public sealed class Client
     /// <exception cref="SignatureException">When the signature does not hold.</exception>
     public Responses.SubscriptionWebhook SubscriptionWebhook(byte[] payload, string? signature)
     {
-        if (!_signature.Verify(payload, signature))
-        {
-            throw new SignatureException("Bildirimin imzası doğrulanamadı; bildirim ödeme geçidinden gelmemiş olabilir.");
-        }
-
-        return new Responses.SubscriptionWebhook(Decode(payload, 0));
+        return new Responses.SubscriptionWebhook(Webhook(payload, signature));
     }
 
     public Responses.SubscriptionWebhook SubscriptionWebhook(string payload, string? signature)
     {
         return SubscriptionWebhook(Encoding.UTF8.GetBytes(payload), signature);
+    }
+
+    /// <summary>
+    /// Read the word the gateway sent about an order: that it was paid, with
+    /// the payment that paid it. Posted to the address the order was opened
+    /// with and read the way a subscription's word is.
+    /// </summary>
+    /// <exception cref="SignatureException">When the signature does not hold.</exception>
+    public OrderWebhook OrderWebhook(byte[] payload, string? signature)
+    {
+        return new OrderWebhook(Webhook(payload, signature));
+    }
+
+    public OrderWebhook OrderWebhook(string payload, string? signature)
+    {
+        return OrderWebhook(Encoding.UTF8.GetBytes(payload), signature);
+    }
+
+    /// <summary>
+    /// Read the word the gateway sent about a payment the customer finished at
+    /// their bank: the same answer <c>RetrievePaymentAsync</c> gives, with the
+    /// state reached on top. Posted to the address the payment was started
+    /// with and read the way a subscription's word is.
+    /// </summary>
+    /// <exception cref="SignatureException">When the signature does not hold.</exception>
+    public TransactionWebhook TransactionWebhook(byte[] payload, string? signature)
+    {
+        return new TransactionWebhook(Webhook(payload, signature));
+    }
+
+    public TransactionWebhook TransactionWebhook(string payload, string? signature)
+    {
+        return TransactionWebhook(Encoding.UTF8.GetBytes(payload), signature);
+    }
+
+    /// <summary>
+    /// Check a word's signature and open it. Nothing in it is believed until
+    /// the signature holds.
+    /// </summary>
+    private JsonElement Webhook(byte[] payload, string? signature)
+    {
+        if (!_signature.Verify(payload, signature))
+        {
+            throw new SignatureException("Bildirimin imzası doğrulanamadı; bildirim ödeme geçidinden gelmemiş olabilir.");
+        }
+
+        return Decode(payload, 0);
     }
 
     /// <summary>

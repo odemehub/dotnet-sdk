@@ -31,6 +31,14 @@ public sealed class OrderPayment : ChannelMessage
     /// <summary>Where the customer goes if they turn back without paying.</summary>
     public string? CancelUrl { get; init; }
 
+    /// <summary>
+    /// Where the merchant's own server is told the order was paid, signed the
+    /// way every answer is. The customer's browser carries the word to
+    /// <see cref="SuccessUrl"/> only if the customer stays for it; this address
+    /// hears either way.
+    /// </summary>
+    public string? WebhookUrl { get; init; }
+
     public string? Description { get; init; }
 
     /// <summary>Three letters, e.g. TRY. Left out, the gateway takes the lira.</summary>
@@ -56,8 +64,50 @@ public sealed class OrderPayment : ChannelMessage
                 ("currency", Currency),
                 ("success_url", SuccessUrl),
                 ("cancel_url", CancelUrl),
+                ("webhook_url", WebhookUrl),
                 ("items", new JsonArray(Items.Select(item => (JsonNode)item.ToBody()).ToArray())))),
             ("customer", Customer.ToBody()));
+    }
+}
+
+/// <summary>
+/// Where an order stands: what it is for, whether it has been paid and, if
+/// so, by which payment. The order is named by the token the gateway gave it
+/// when it was opened, which is all a merchant holds of an order whose
+/// customer never came back from the checkout. Nothing is changed by asking.
+/// </summary>
+public sealed class RetrieveOrder : Message
+{
+    /// <summary>The order's token in the gateway, as it answered when it was opened.</summary>
+    public required string OrderToken { get; init; }
+
+    internal override string Path => "retrieve-order";
+
+    internal override JsonObject ToBody(string channelToken)
+    {
+        return Fields.Of(("order", Fields.Of(("token", OrderToken))));
+    }
+}
+
+/// <summary>
+/// Every attempt at paying something the merchant names by its own number on
+/// a channel: the order number it opened an order with, or started a payment
+/// with. How many times the customer tried, which were refused and which went
+/// through. Nothing is changed by asking.
+/// </summary>
+public sealed class RetrieveTransactions : ChannelMessage
+{
+    /// <summary>The number the payments were made under in the calling system.</summary>
+    public required string ChannelReference { get; init; }
+
+    internal override string Path => "retrieve-transactions";
+
+    internal override JsonObject ToBody(string channelToken)
+    {
+        return Fields.Of(
+            ("transaction", Fields.Of(
+                ("channel_token", Channel(channelToken)),
+                ("channel_reference", ChannelReference))));
     }
 }
 
