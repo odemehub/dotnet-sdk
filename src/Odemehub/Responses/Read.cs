@@ -83,6 +83,29 @@ internal static class Read
             : 0;
     }
 
+    internal static int? OptionalInt(JsonElement value)
+    {
+        return IsSaid(value) ? Int(value) : null;
+    }
+
+    /// <summary>
+    /// A value of one of the client's enums: <c>Unknown</c> for one this
+    /// version does not know, null for one the answer did not carry.
+    /// </summary>
+    internal static T? OptionalEnum<T>(JsonElement value) where T : struct, System.Enum
+    {
+        return Odemehub.Enums.Wire.Read<T>(NonEmptyString(value));
+    }
+
+    /// <summary>
+    /// A value of one of the client's enums the answer always carries;
+    /// <c>Unknown</c> for one this version does not know.
+    /// </summary>
+    internal static T Enum<T>(JsonElement value) where T : struct, System.Enum
+    {
+        return OptionalEnum<T>(value) ?? default;
+    }
+
     internal static IReadOnlyList<T> List<T>(JsonElement value, Func<JsonElement, T> read)
     {
         return value.ValueKind switch

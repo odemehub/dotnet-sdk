@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Odemehub.Enums;
 
 namespace Odemehub.Responses;
 
@@ -31,15 +32,15 @@ public sealed record Conversion
     internal Conversion(JsonElement conversion)
     {
         Amount = Read.String(conversion.Field("amount"));
-        Currency = Read.String(conversion.Field("currency"));
+        Currency = Read.Enum<Currency>(conversion.Field("currency"));
         Rate = Read.String(conversion.Field("rate"));
     }
 
     /// <summary>What was taken from the card.</summary>
     public string Amount { get; }
 
-    /// <summary>The money it was taken in, e.g. TRY.</summary>
-    public string Currency { get; }
+    /// <summary>The money it was taken in.</summary>
+    public Currency Currency { get; }
 
     /// <summary>What a unit of the asked-for money was charged as, with any margin on top.</summary>
     public string Rate { get; }
@@ -47,9 +48,12 @@ public sealed record Conversion
 
 /// <summary>
 /// The outcome of a payment, as the gateway reports it — whether it answers
-/// straight away or posts the outcome back once the customer is home from
-/// their bank. The two are the same shape, so a merchant reads them the same
-/// way: how it went, which payment it was, and whose.
+/// straight away, is asked after by the payment's token or the merchant's
+/// reference, or posts the outcome back once the customer is home from their
+/// bank. The shape is the answer's own: how it went (<c>result</c>), the
+/// payment (<c>transaction</c>), whose it was (<c>customer</c>), what reached
+/// the card in another money (<c>conversion</c>) and the card it kept
+/// (<c>saved_card</c>).
 /// </summary>
 /// <remarks>
 /// A payment that was turned down is an outcome like any other and arrives
@@ -60,32 +64,35 @@ public record Payment
 {
     internal Payment(JsonElement body)
     {
-        var transaction = body.Field("transaction");
+        var customer = body.Field("customer");
         var savedCard = body.Field("saved_card");
         var conversion = body.Field("conversion");
 
         Result = new Result(body);
-        TransactionToken = Read.String(transaction.Field("token"));
-        ChannelToken = Read.String(transaction.Field("channel_token"));
-        ChannelReference = Read.String(transaction.Field("channel_reference"));
-        CustomerChannelReference = Read.String(body.Field("customer").Field("channel_reference"));
-        SavedCard = savedCard.ValueKind == JsonValueKind.Object ? new SavedCard(savedCard) : null;
+        Transaction = new PaymentTransaction(body.Field("transaction"));
+        Customer = customer.ValueKind == JsonValueKind.Object ? new PaymentCustomer(customer) : null;
         Conversion = conversion.ValueKind == JsonValueKind.Object ? new Conversion(conversion) : null;
+        SavedCard = savedCard.ValueKind == JsonValueKind.Object ? new SavedCard(savedCard) : null;
     }
 
     public Result Result { get; }
 
-    /// <summary>The payment's token in the gateway, which names it again for a refund.</summary>
-    public string TransactionToken { get; }
+    /// <summary>The payment itself.</summary>
+    public PaymentTransaction Transaction { get; }
 
-    /// <summary>The channel the payment came in on.</summary>
-    public string ChannelToken { get; }
+    /// <summary>
+    /// Who the payment was made for, as the payment wrote them down: the
+    /// merchant's reference for them — null for a payer nobody keeps one for —
+    /// and the billing address.
+    /// </summary>
+    public PaymentCustomer? Customer { get; }
 
-    /// <summary>The reference the payment is known by in the calling system.</summary>
-    public string ChannelReference { get; }
-
-    /// <summary>The merchant's own key for the customer the payment was made for.</summary>
-    public string CustomerChannelReference { get; }
+    /// <summary>
+    /// What reached the card, for a payment the merchant's conversion rules
+    /// charged in another money than it was asked in; null for a payment
+    /// charged as it was asked.
+    /// </summary>
+    public Conversion? Conversion { get; }
 
     /// <summary>
     /// The card the payment kept, for a payment that asked for one to be kept.
@@ -94,13 +101,79 @@ public record Payment
     /// payment never asked.
     /// </summary>
     public SavedCard? SavedCard { get; }
+}
 
-    /// <summary>
-    /// What reached the card, for a payment the merchant's conversion rules
-    /// charged in another money than it was asked in; null for a payment
-    /// charged as it was asked.
-    /// </summary>
-    public Conversion? Conversion { get; }
+/// <summary>
+/// A payment as an outcome says it, in full. A payment made at an order, a
+/// payment link or a subscription names it, so a webhook about one of them can
+/// be checked against the payment it names.
+/// </summary>
+public sealed record PaymentTransaction
+{
+    internal PaymentTransaction(JsonElement transaction)
+    {
+        Token = Read.String(transaction.Field("token"));
+        ChannelToken = Read.String(transaction.Field("channel_token"));
+        ChannelReference = Read.String(transaction.Field("channel_reference"));
+        Status = Read.OptionalEnum<TransactionStatus>(transaction.Field("status"));
+        PaymentStatus = Read.OptionalEnum<PaymentStatus>(transaction.Field("payment_status"));
+        SecurityType = Read.OptionalEnum<SecurityType>(transaction.Field("security_type"));
+        Amount = Read.OptionalString(transaction.Field("amount"));
+        BaseAmount = Read.OptionalString(transaction.Field("base_amount"));
+        Currency = Read.OptionalEnum<Currency>(transaction.Field("currency"));
+        InstallmentNumber = Read.OptionalInt(transaction.Field("installment_number"));
+        IsTest = Read.OptionalBool(transaction.Field("is_test"));
+        CreatedAt = Read.NonEmptyString(transaction.Field("created_at"));
+        OrderToken = Read.NonEmptyString(transaction.Field("order").Field("token"));
+        PaymentLinkToken = Read.NonEmptyString(transaction.Field("payment_link").Field("token"));
+        SubscriptionToken = Read.NonEmptyString(transaction.Field("subscription").Field("token"));
+    }
+
+    /// <summary>The payment's token in the gateway, which names it again to ask after it or give money back.</summary>
+    public string Token { get; }
+
+    /// <summary>The channel the payment came in on.</summary>
+    public string ChannelToken { get; }
+
+    /// <summary>The reference the payment is known by in the calling system.</summary>
+    public string ChannelReference { get; }
+
+    /// <summary>The attempt's state.</summary>
+    public TransactionStatus? Status { get; }
+
+    /// <summary>What became of the money.</summary>
+    public PaymentStatus? PaymentStatus { get; }
+
+    /// <summary>How it was made: confirmed at the bank or charged straight to the card.</summary>
+    public SecurityType? SecurityType { get; }
+
+    /// <summary>What the card was charged, with the kurus behind a point.</summary>
+    public string? Amount { get; }
+
+    /// <summary>What was being sold, before anything added for instalments.</summary>
+    public string? BaseAmount { get; }
+
+    public Currency? Currency { get; }
+
+    public int? InstallmentNumber { get; }
+
+    /// <summary>Whether it was made in the test environment.</summary>
+    public bool? IsTest { get; }
+
+    /// <summary>When the attempt was made, in UTC.</summary>
+    public string? CreatedAt { get; }
+
+    /// <summary>The order the payment was made at; null when it was made at none.</summary>
+    public string? OrderToken { get; }
+
+    /// <summary>The payment link the payment was made on; null when it was made on none.</summary>
+    public string? PaymentLinkToken { get; }
+
+    /// <summary>The subscription whose renewal the payment paid; null when it paid none.</summary>
+    public string? SubscriptionToken { get; }
+
+    /// <summary>Whether the attempt went through.</summary>
+    public bool IsSuccessful => Status == TransactionStatus.Successful;
 }
 
 /// <summary>
@@ -130,73 +203,35 @@ public sealed record RegularPayment : Payment
 }
 
 /// <summary>
-/// Money given back out of a payment: a cancellation or a refund.
+/// Money given back out of a payment: a cancellation or a refund. The payment
+/// is said as it stands after it.
 /// </summary>
 public sealed record GiveBack : Payment
 {
     internal GiveBack(JsonElement body) : base(body)
     {
         var refund = body.Field("refund");
-        Type = Read.String(refund.Field("type"));
-        Amount = Read.OptionalString(refund.Field("amount"));
+        Refund = refund.ValueKind == JsonValueKind.Object ? new Refund(refund) : null;
     }
 
-    /// <summary>Which of the two it was: a cancellation or a refund.</summary>
-    public string Type { get; }
-
-    /// <summary>How much actually went back, whether or not it was asked for by name.</summary>
-    public string? Amount { get; }
+    /// <summary>What was given back.</summary>
+    public Refund? Refund { get; }
 }
 
 /// <summary>
-/// A product in the merchant's catalogue at the gateway.
+/// What a cancellation or a refund gave back.
 /// </summary>
-public sealed record Product
+public sealed record Refund
 {
-    internal Product(JsonElement body)
+    internal Refund(JsonElement refund)
     {
-        var product = body.Field("product");
-
-        Result = new Result(body);
-        ChannelToken = Read.String(product.Field("channel_token"));
-        ChannelReference = Read.String(product.Field("channel_reference"));
-        Name = Read.String(product.Field("name"));
-        Image = Read.OptionalString(product.Field("image"));
-        Type = Read.String(product.Field("type"));
-        Amount = Read.String(product.Field("amount"));
-        Currency = Read.String(product.Field("currency"));
-        TaxRate = Read.String(product.Field("tax_rate"));
-        Period = Read.OptionalString(product.Field("period"));
-        IsActive = Read.Bool(product.Field("is_active"));
+        Type = Read.Enum<RefundType>(refund.Field("type"));
+        Amount = Read.String(refund.Field("amount"));
     }
 
-    public Result Result { get; }
+    /// <summary>Which of the two it was.</summary>
+    public RefundType Type { get; }
 
-    /// <summary>The channel the product is sold on.</summary>
-    public string ChannelToken { get; }
-
-    /// <summary>The key the product is known by in the calling system.</summary>
-    public string ChannelReference { get; }
-
-    public string Name { get; }
-
-    /// <summary>The address of the picture the checkout shows it with; null when it has none.</summary>
-    public string? Image { get; }
-
-    /// <summary>simple or recurring.</summary>
-    public string Type { get; }
-
-    /// <summary>The price of one, as digits with the kurus behind a point.</summary>
+    /// <summary>How much went back, whether or not it was asked for by name.</summary>
     public string Amount { get; }
-
-    public string Currency { get; }
-
-    /// <summary>The tax included in the price, as a percentage.</summary>
-    public string TaxRate { get; }
-
-    /// <summary>monthly or annually for a recurring product; null for a simple one.</summary>
-    public string? Period { get; }
-
-    /// <summary>Whether it is on sale.</summary>
-    public bool IsActive { get; }
 }

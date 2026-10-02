@@ -16,7 +16,7 @@ public sealed class Options
     /// <summary>The address the application is served from, e.g. https://app.odemehub.com.</summary>
     public required string BaseUrl { get; init; }
 
-    /// <summary>The team the payments are made on behalf of, as the Entegrasyon page names it.</summary>
+    /// <summary>The team the payments are made on behalf of: the ten-digit workspace id the Entegrasyon page shows.</summary>
     public required string Team { get; init; }
 
     /// <summary>
@@ -35,11 +35,20 @@ public sealed class Options
     public TimeSpan Timeout { get; init; } = TimeSpan.FromMinutes(1);
 
     /// <summary>
+    /// The path of a gateway endpoint for this team, as it is signed: with its
+    /// leading slash and nothing in front of it.
+    /// </summary>
+    public string Path(string endpoint)
+    {
+        return $"/api/{Team}/gateway/{endpoint}";
+    }
+
+    /// <summary>
     /// The full address of a gateway endpoint for this team.
     /// </summary>
-    public string Url(string path)
+    public string Url(string endpoint)
     {
-        return $"{BaseUrl.TrimEnd('/')}/api/{Team}/gateway/{path}";
+        return BaseUrl.TrimEnd('/') + Path(endpoint);
     }
 
     public override string ToString()

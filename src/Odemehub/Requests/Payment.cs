@@ -1,5 +1,5 @@
-using System;
 using System.Text.Json.Nodes;
+using Odemehub.Enums;
 
 namespace Odemehub.Requests;
 
@@ -9,8 +9,9 @@ namespace Odemehub.Requests;
 /// </summary>
 /// <remarks>
 /// A payment is made with a card the customer typed in or with one they let
-/// the merchant keep, never with both: naming a kept card and a card at once
-/// is turned down by the gateway, so it is turned down here first.
+/// the merchant keep, never with both. With a kept card the payment goes
+/// through the account the card is kept at, so no account is named either;
+/// the gateway turns down a payment that names both.
 /// </remarks>
 public abstract class Payment : ChannelMessage
 {
@@ -28,11 +29,13 @@ public abstract class Payment : ChannelMessage
     /// </summary>
     public required string Amount { get; init; }
 
+    /// <summary>1 to 12. More than one only when the payment is asked for and charged in lira.</summary>
     public required int InstallmentNumber { get; init; }
 
     /// <summary>The address the customer is paying from, as the merchant sees it.</summary>
     public required string Ip { get; init; }
 
+    /// <summary>Who is paying: the reference, if any, and the whole billing address.</summary>
     public required Customer Customer { get; init; }
 
     /// <summary>The card typed in. Left out only when a kept card is named instead.</summary>
@@ -41,21 +44,21 @@ public abstract class Payment : ChannelMessage
     /// <summary>A card the customer let the merchant keep, by the token the gateway gave it.</summary>
     public string? SavedCardToken { get; init; }
 
-    /// <summary>Three letters, e.g. TRY. Left out, the gateway takes the lira.</summary>
-    public string? Currency { get; init; }
+    /// <summary>Left out, the gateway takes the lira.</summary>
+    public Currency? Currency { get; init; }
 
     /// <summary>
     /// The payment account to charge through. Left out, the team's routing
     /// rules pick the account, and the team's default account is used when
-    /// none of them holds. A payment with a kept card always goes through the
-    /// account the card is kept at.
+    /// none of them holds. Never named together with a kept card.
     /// </summary>
     public string? PaymentProviderToken { get; init; }
 
     /// <summary>
     /// What is being sold, where the customer spreads the amount over months
-    /// and the bank takes something for the waiting on top of it. Left out
-    /// where the two are the same, which is most payments.
+    /// and the bank takes something for the waiting on top of it. Never more
+    /// than the amount. Left out where the two are the same, which is most
+    /// payments.
     /// </summary>
     public string? BaseAmount { get; init; }
 
@@ -65,30 +68,19 @@ public abstract class Payment : ChannelMessage
     /// </summary>
     internal override JsonObject ToBody(string channelToken)
     {
-        if ((Card is null) == (SavedCardToken is null))
-        {
-            throw new ArgumentException("Bir ödeme ya bir kartla ya da kayıtlı bir kartla yapılır; ikisi birden ya da hiçbiri verilemez.");
-        }
-
-        var body = Fields.Of(
+        return Fields.Said(
             ("transaction", Fields.Said(
                 ("channel_token", Channel(channelToken)),
                 ("channel_reference", ChannelReference),
                 ("payment_provider_token", PaymentProviderToken),
                 ("amount", Amount),
                 ("base_amount", BaseAmount),
-                ("currency", Currency),
+                ("currency", Wire.Of(Currency)),
                 ("installment_number", InstallmentNumber),
                 ("ip", Ip),
                 ("saved_card_token", SavedCardToken))),
-            ("customer", Customer.ToBody()));
-
-        if (Card is not null)
-        {
-            body["card"] = Card.ToBody();
-        }
-
-        return body;
+            ("customer", Customer.ToBody()),
+            ("card", Card?.ToBody()));
     }
 }
 
@@ -99,17 +91,12 @@ public abstract class Payment : ChannelMessage
 /// </summary>
 public sealed class SecurePayment : Payment
 {
-    /// <summary>Where the customer is posted back to, with the signed outcome, once they are done at their bank.</summary>
-    public required string CallbackUrl { get; init; }
-
     /// <summary>
-    /// Where the merchant's own server is told how the payment went, signed
-    /// the way every answer is. The customer's browser carries the word to
-    /// <see cref="CallbackUrl"/> only if the customer stays for it; this
-    /// address hears either way, including when the customer never opened the
-    /// bank's page and the payment expired.
+    /// Where the customer's browser is posted back to once they are done at
+    /// their bank, with the payment's token, the reference and a hint at how it
+    /// went. An address reachable from the internet.
     /// </summary>
-    public string? WebhookUrl { get; init; }
+    public required string CallbackUrl { get; init; }
 
     internal override string Path => "secure-payment";
 
@@ -117,11 +104,6 @@ public sealed class SecurePayment : Payment
     {
         var body = base.ToBody(channelToken);
         body["transaction"]!["callback_url"] = CallbackUrl;
-
-        if (WebhookUrl is not null)
-        {
-            body["transaction"]!["webhook_url"] = WebhookUrl;
-        }
 
         return body;
     }
@@ -146,7 +128,8 @@ public sealed class RefundPayment : PaymentMessage
     /// How much goes back, as digits with the kurus behind a point: "35.50".
     /// Leave it out and everything the payment has left in it goes back. It is
     /// never more than the payment has left: the gateway turns down anything
-    /// larger.
+    /// larger. A payment charged in another money by the team's conversion
+    /// rules is refunded in the money it was charged in.
     /// </summary>
     public string? Amount { get; init; }
 
@@ -166,9 +149,10 @@ public sealed class RefundPayment : PaymentMessage
 }
 
 /// <summary>
-/// The whole of a payment taken back before the provider has settled it.
-/// There is no amount to name: a cancellation is always for the whole of the
-/// payment, and anything less goes back as a refund.
+/// The whole of a payment taken back before the provider settles it. There
+/// is no amount to name: a cancellation is always for the whole of it, and a
+/// payment part of which has already been refunded can only be refunded for
+/// the rest.
 /// </summary>
 public sealed class CancelPayment : PaymentMessage
 {
@@ -176,14 +160,35 @@ public sealed class CancelPayment : PaymentMessage
 }
 
 /// <summary>
-/// How a payment went, asked for after the fact. A customer sent to their bank
-/// comes back carrying the payment's token and nothing more, because a browser
-/// cannot be given anything to sign with; this is the call that says what
-/// became of it.
+/// How a payment went, asked for after the fact by its token. A customer sent
+/// to their bank comes back carrying the payment's token and nothing more,
+/// because a browser cannot be given anything to sign with; this is the call
+/// that says what became of it.
 /// </summary>
-public sealed class RetrievePayment : PaymentMessage
+public sealed class RetrievePayment : RetrieveByToken
 {
-    internal override string Path => "retrieve-payment";
+    internal override string Endpoint => "retrieve-payment";
+}
+
+/// <summary>
+/// How the latest payment under one of the merchant's own references went,
+/// for the merchant that started a payment and never heard back. A customer
+/// may have tried more than once under the same reference; the last attempt
+/// is the one answered, and <see cref="RetrievePaymentsByChannelReference"/>
+/// lists them all.
+/// </summary>
+public sealed class RetrievePaymentByReference : RetrieveByReference
+{
+    internal override string Path => "retrieve-payment-by-reference";
+}
+
+/// <summary>
+/// Every payment attempt made on a channel within a span of days, the ones
+/// the bank turned away included, oldest first.
+/// </summary>
+public sealed class RetrievePaymentsByChannelReference : RetrieveByChannelReference
+{
+    internal override string Path => "retrieve-payments-by-channel-reference";
 }
 
 /// <summary>
@@ -210,8 +215,8 @@ public sealed class RetrieveBin : Message
     /// </summary>
     public string? PaymentProviderToken { get; init; }
 
-    /// <summary>The money the payment is taken in; the lira unless another is named.</summary>
-    public string? Currency { get; init; }
+    /// <summary>The money the payment is taken in; the lira unless another is named. Instalments are only answered for lira.</summary>
+    public Currency? Currency { get; init; }
 
     internal override string Path => "retrieve-bin";
 
@@ -221,7 +226,7 @@ public sealed class RetrieveBin : Message
             ("transaction", Fields.Said(
                 ("payment_provider_token", PaymentProviderToken),
                 ("amount", Amount),
-                ("currency", Currency))),
+                ("currency", Wire.Of(Currency)))),
             ("card", Fields.Of(("bin", Bin))));
     }
 }

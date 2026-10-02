@@ -1,48 +1,53 @@
 using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json;
+using Odemehub.Enums;
 
 namespace Odemehub.Responses;
 
 /// <summary>
 /// An order as the gateway keeps it: what is being paid for, what it comes
-/// to, where it stands and — once it is paid — the payment that paid it. The
-/// same answer comes back whether the order has just been opened, asked
-/// after, or the gateway is telling the merchant it was paid.
+/// to, where it stands, whose it is and — once it is paid — the payment that
+/// paid it. The same shape comes back whether the order has just been opened,
+/// changed, asked after or listed.
 /// </summary>
 /// <remarks>
 /// Nothing is charged when an order is opened: the customer has to be sent to
-/// <see cref="CheckoutUrl"/> and gives their card there. What becomes of it is
-/// posted to the merchant's webhook address, if it gave one, and is always
-/// there to be asked after by the order's token.
+/// <see cref="CheckoutUrl"/> and gives their card there.
 /// </remarks>
 public sealed record Order
 {
-    internal Order(JsonElement body)
+    /// <summary>An order as an answer carries it: under <c>order</c>, with the customer beside it.</summary>
+    internal Order(JsonElement body) : this(body.Field("order"), body.Field("customer"))
     {
-        var order = body.Field("order");
+    }
 
-        Result = new Result(body);
+    internal Order(JsonElement order, JsonElement customer)
+    {
+        var shippingMethod = order.Field("shipping_method");
+        var transaction = order.Field("transaction");
+
         Token = Read.String(order.Field("token"));
         ChannelToken = Read.String(order.Field("channel_token"));
         ChannelReference = Read.String(order.Field("channel_reference"));
         Description = Read.NonEmptyString(order.Field("description"));
-        Status = Read.String(order.Field("status"));
-        Items = Read.List(order.Field("items"), item => new OrderItem(item));
-        Subtotal = Read.NonEmptyString(order.Field("subtotal"));
-        TaxAmount = Read.NonEmptyString(order.Field("tax_amount"));
+        PaymentProviderToken = Read.NonEmptyString(order.Field("payment_provider_token"));
+        Status = Read.Enum<OrderStatus>(order.Field("status"));
+        Items = Read.List(order.Field("items"), item => new Item(item));
+        ShippingMethods = Read.List(order.Field("shipping_methods"), method => new ShippingMethod(method));
+        ShippingMethod = shippingMethod.ValueKind == JsonValueKind.Object ? new ShippingMethod(shippingMethod) : null;
+        Subtotal = Read.String(order.Field("subtotal"));
+        ShippingAmount = Read.String(order.Field("shipping_amount"));
+        TaxAmount = Read.String(order.Field("tax_amount"));
         Amount = Read.String(order.Field("amount"));
-        Currency = Read.String(order.Field("currency"));
+        Currency = Read.Enum<Currency>(order.Field("currency"));
         IsTest = Read.OptionalBool(order.Field("is_test"));
         CreatedAt = Read.NonEmptyString(order.Field("created_at"));
         CheckoutUrl = Read.NonEmptyString(order.Field("checkout_url"));
-        TransactionToken = Read.NonEmptyString(order.Field("transaction").Field("token"));
-        CustomerChannelReference = Read.NonEmptyString(body.Field("customer").Field("channel_reference"));
+        Transaction = transaction.ValueKind == JsonValueKind.Object ? new TransactionReference(transaction) : null;
+        Customer = customer.ValueKind == JsonValueKind.Object ? new NamedCustomer(customer) : null;
     }
 
-    public Result Result { get; }
-
-    /// <summary>The order's token in the gateway; name it to ask after it later.</summary>
+    /// <summary>The order's token in the gateway; name it to ask after or change it later.</summary>
     public string Token { get; }
 
     /// <summary>The channel the order was opened on.</summary>
@@ -53,234 +58,122 @@ public sealed record Order
 
     public string? Description { get; }
 
+    /// <summary>The account the order is paid through; null when the team's Gate rules and default account decide.</summary>
+    public string? PaymentProviderToken { get; }
+
     /// <summary>Where the order stands: open until it is paid, then paid.</summary>
-    public string Status { get; }
+    public OrderStatus Status { get; }
 
     /// <summary>What the order is made up of.</summary>
-    public IReadOnlyList<OrderItem> Items { get; }
+    public IReadOnlyList<Item> Items { get; }
 
-    /// <summary>What the lines come to before tax; null when no line carried a rate.</summary>
-    public string? Subtotal { get; }
+    /// <summary>The ways the goods may be sent, as the merchant offered them.</summary>
+    public IReadOnlyList<ShippingMethod> ShippingMethods { get; }
 
-    /// <summary>The tax the order carries; null when no line carried a rate.</summary>
-    public string? TaxAmount { get; }
+    /// <summary>The way the payer picked; null until they have, or when none was offered.</summary>
+    public ShippingMethod? ShippingMethod { get; }
 
-    /// <summary>What the order comes to, added up from its lines by the gateway.</summary>
+    /// <summary>What the lines come to before tax.</summary>
+    public string Subtotal { get; }
+
+    /// <summary>What the picked way of sending comes to before tax.</summary>
+    public string ShippingAmount { get; }
+
+    /// <summary>The tax the lines and the sending carry.</summary>
+    public string TaxAmount { get; }
+
+    /// <summary>What the order comes to, added up by the gateway: the lines and the picked way of sending.</summary>
     public string Amount { get; }
 
-    public string Currency { get; }
+    public Currency Currency { get; }
 
-    /// <summary>Whether it was paid in the test environment; null until it is paid.</summary>
+    /// <summary>Whether it was opened in the test environment.</summary>
     public bool? IsTest { get; }
 
     public string? CreatedAt { get; }
 
-    /// <summary>Where the customer pays, while the order is still open; null once it is paid.</summary>
+    /// <summary>Where the customer pays, while the order can still be paid; null once it is paid.</summary>
     public string? CheckoutUrl { get; }
 
-    /// <summary>The token of the payment that paid the order, which names it again for a refund; null while it is open.</summary>
-    public string? TransactionToken { get; }
+    /// <summary>The payment that paid the order, which names it again for a refund; null while it is open.</summary>
+    public TransactionReference? Transaction { get; }
 
-    /// <summary>The merchant's own key for the customer the order is for; null for an order opened without one.</summary>
-    public string? CustomerChannelReference { get; }
+    /// <summary>Who the order is for; null while nobody has said.</summary>
+    public NamedCustomer? Customer { get; }
 
     /// <summary>Whether the order has been paid.</summary>
-    public bool IsPaid => Status == "paid";
+    public bool IsPaid => Status == OrderStatus.Paid;
 }
 
 /// <summary>
-/// One line of what an order is made up of, as it was written down when the
-/// order was opened: filled in from the catalogue where the line said
-/// nothing, and as the line said where it did.
+/// The payment that paid an order: enough to ask after it or give money back
+/// out of it, and what has become of its money since.
 /// </summary>
-public sealed record OrderItem
+public sealed record TransactionReference
 {
-    internal OrderItem(JsonElement item)
+    internal TransactionReference(JsonElement transaction)
     {
-        ChannelReference = Read.String(item.Field("channel_reference"));
-        Name = Read.String(item.Field("name"));
-        Image = Read.OptionalString(item.Field("image"));
-        Quantity = Read.Int(item.Field("quantity"));
-        UnitAmount = Read.String(item.Field("unit_amount"));
-        TaxRate = Read.OptionalString(item.Field("tax_rate"));
-        TaxAmount = Read.OptionalString(item.Field("tax_amount"));
-    }
-
-    /// <summary>The merchant's own key for what is on the line.</summary>
-    public string ChannelReference { get; }
-
-    public string Name { get; }
-
-    /// <summary>The picture the line is shown with; null when it has none.</summary>
-    public string? Image { get; }
-
-    public int Quantity { get; }
-
-    /// <summary>The price of one, as digits with the kurus behind a point.</summary>
-    public string UnitAmount { get; }
-
-    /// <summary>The tax included in the price, as a percentage; null for a line with no rate.</summary>
-    public string? TaxRate { get; }
-
-    /// <summary>The tax the line comes to; null for a line with no rate.</summary>
-    public string? TaxAmount { get; }
-}
-
-/// <summary>
-/// Word the gateway sent about one of the merchant's orders: that it was
-/// paid, with the payment that paid it. An order is only ever told of once;
-/// an attempt that fails leaves it open and the customer trying again.
-/// </summary>
-public sealed record OrderWebhook
-{
-    internal OrderWebhook(JsonElement body)
-    {
-        Event = Read.String(body.Field("event"));
-        Order = new Order(body);
-    }
-
-    /// <summary>The state reached: paid.</summary>
-    public string Event { get; }
-
-    /// <summary>The order as it stands now, with the payment that paid it.</summary>
-    public Order Order { get; }
-
-    /// <summary>Whether the order has been paid, which is the one thing said here.</summary>
-    public bool IsPaid => Event == "paid";
-}
-
-/// <summary>
-/// Word the gateway sent about a payment the merchant started and the
-/// customer finished — or did not — at their bank. It is the same answer
-/// <c>RetrievePaymentAsync</c> gives, with the state reached on top: the
-/// customer may have closed the page before their browser could bring the
-/// outcome back, and then this is the only word the merchant hears.
-/// </summary>
-public sealed record TransactionWebhook : Payment
-{
-    internal TransactionWebhook(JsonElement body) : base(body)
-    {
-        Event = Read.String(body.Field("event"));
-    }
-
-    /// <summary>The state reached: successful, failed or expired.</summary>
-    public string Event { get; }
-
-    /// <summary>Whether the payment went through.</summary>
-    public bool IsSuccessful => Event == "successful";
-
-    /// <summary>Whether the bank turned the payment away.</summary>
-    public bool IsFailed => Event == "failed";
-
-    /// <summary>Whether the customer never opened the bank's page in time, so the payment was closed without being tried.</summary>
-    public bool IsExpired => Event == "expired";
-}
-
-/// <summary>
-/// One attempt at a payment, as the gateway lists it: enough to tell the
-/// attempts apart and see where each got to. Where it stands is said twice on
-/// purpose — the attempt's own state, and what became of the money, which can
-/// move on to refunded long after the attempt is over.
-/// </summary>
-public sealed record Transaction
-{
-    internal Transaction(JsonElement transaction)
-    {
-        var conversion = transaction.Field("conversion");
-        var installmentNumber = Read.Int(transaction.Field("installment_number"));
-
         Token = Read.String(transaction.Field("token"));
         ChannelToken = Read.String(transaction.Field("channel_token"));
         ChannelReference = Read.String(transaction.Field("channel_reference"));
-        Status = Read.String(transaction.Field("status"));
-        PaymentStatus = Read.String(transaction.Field("payment_status"));
-        SecurityType = Read.String(transaction.Field("security_type"));
-        Amount = Read.String(transaction.Field("amount"));
-        BaseAmount = Read.String(transaction.Field("base_amount"));
-        Currency = Read.String(transaction.Field("currency"));
-        InstallmentNumber = installmentNumber == 0 ? 1 : installmentNumber;
-        IsTest = Read.Bool(transaction.Field("is_test"));
-        ErrorCode = Read.NonEmptyString(transaction.Field("error_code"));
-        ErrorMessage = Read.NonEmptyString(transaction.Field("error_message"));
-        CreatedAt = Read.NonEmptyString(transaction.Field("created_at"));
-        CustomerChannelReference = Read.NonEmptyString(transaction.Field("customer").Field("channel_reference"));
-        Conversion = conversion.ValueKind == JsonValueKind.Object ? new Conversion(conversion) : null;
-        OrderToken = Read.NonEmptyString(transaction.Field("order").Field("token"));
-        SubscriptionToken = Read.NonEmptyString(transaction.Field("subscription").Field("token"));
+        PaymentStatus = Read.OptionalEnum<PaymentStatus>(transaction.Field("payment_status"));
     }
 
-    /// <summary>The payment's token in the gateway, which names it again to ask after or give back.</summary>
+    /// <summary>The payment's token in the gateway.</summary>
     public string Token { get; }
 
     /// <summary>The channel the payment came in on.</summary>
     public string ChannelToken { get; }
 
-    /// <summary>The reference the payment was made under in the calling system.</summary>
+    /// <summary>The reference the payment was made under.</summary>
     public string ChannelReference { get; }
 
-    /// <summary>The attempt's state: started, redirected_to_secure_page, returned_from_secure_page, failed, expired or successful.</summary>
-    public string Status { get; }
-
-    /// <summary>What became of the money: unpaid, paid, cancelled, refunded or partially_refunded.</summary>
-    public string PaymentStatus { get; }
-
-    /// <summary>How it was made: secure (confirmed at the bank) or regular.</summary>
-    public string SecurityType { get; }
-
-    /// <summary>What the card was charged, with the kurus behind a point.</summary>
-    public string Amount { get; }
-
-    /// <summary>What was being sold, before anything added for instalments.</summary>
-    public string BaseAmount { get; }
-
-    public string Currency { get; }
-
-    public int InstallmentNumber { get; }
-
-    /// <summary>Whether it was made in the test environment.</summary>
-    public bool IsTest { get; }
-
-    /// <summary>What the provider called the refusal, for an attempt that failed; null otherwise.</summary>
-    public string? ErrorCode { get; }
-
-    /// <summary>Why it failed, written for a person; null otherwise.</summary>
-    public string? ErrorMessage { get; }
-
-    public string? CreatedAt { get; }
-
-    /// <summary>The merchant's own key for the customer; null for a payer the merchant never named.</summary>
-    public string? CustomerChannelReference { get; }
-
-    /// <summary>What reached the card when it was charged in another money; null when charged as asked.</summary>
-    public Conversion? Conversion { get; }
-
-    /// <summary>The token of the order this attempt was at; null when it was at none.</summary>
-    public string? OrderToken { get; }
-
-    /// <summary>The token of the subscription this attempt paid a period of; null when it paid none.</summary>
-    public string? SubscriptionToken { get; }
-
-    /// <summary>Whether the attempt went through.</summary>
-    public bool IsSuccessful => Status == "successful";
+    /// <summary>What became of the money: paid, cancelled, refunded, partially refunded.</summary>
+    public PaymentStatus? PaymentStatus { get; }
 }
 
 /// <summary>
-/// Every attempt made under one of the merchant's own numbers on a channel,
-/// oldest first, so they read as the attempts were made.
+/// An order opened, changed or asked after. Whose it is is said beside the
+/// order, as the answer says it, and on the order as well.
 /// </summary>
-public sealed record Transactions
+public sealed record OrderDetails
 {
-    internal Transactions(JsonElement body)
+    internal OrderDetails(JsonElement body)
     {
         Result = new Result(body);
-        Items = Read.List(body.Field("transactions"), transaction => new Transaction(transaction));
+        Order = new Order(body);
+        Customer = Order.Customer;
     }
 
     public Result Result { get; }
 
-    /// <summary>The attempts, oldest first.</summary>
-    public IReadOnlyList<Transaction> Items { get; }
+    public Order Order { get; }
 
-    /// <summary>The attempt that went through; null when none did.</summary>
-    public Transaction? Successful => Items.FirstOrDefault(transaction => transaction.IsSuccessful);
+    /// <summary>Who the order is for; null while nobody has said. The same as <c>Order.Customer</c>.</summary>
+    public NamedCustomer? Customer { get; }
+}
+
+/// <summary>
+/// Every order opened on a channel within a span of days, oldest first.
+/// </summary>
+public sealed record OrderList
+{
+    internal OrderList(JsonElement body)
+    {
+        Result = new Result(body);
+        CreatedFrom = Read.String(body.Field("created_from"));
+        CreatedTo = Read.String(body.Field("created_to"));
+        Orders = Read.List(body.Field("orders"), order => new Order(order, order.Field("customer")));
+    }
+
+    public Result Result { get; }
+
+    /// <summary>The first day looked at, as <c>YYYY-MM-DD</c> in the team's timezone.</summary>
+    public string CreatedFrom { get; }
+
+    /// <summary>The last day looked at, the same way.</summary>
+    public string CreatedTo { get; }
+
+    /// <summary>The orders, oldest first, each with whose it is.</summary>
+    public IReadOnlyList<Order> Orders { get; }
 }

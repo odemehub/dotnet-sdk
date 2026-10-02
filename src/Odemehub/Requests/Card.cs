@@ -3,21 +3,22 @@ using System.Text.Json.Nodes;
 namespace Odemehub.Requests;
 
 /// <summary>
-/// The card a payment is attempted with. The number and the security code
-/// travel no further than the request body, and are kept out of
-/// <see cref="ToString"/> so they never reach a log: the gateway keeps only the
-/// head and the tail digits of the number and no digit of the code.
+/// The card a payment is attempted with, or kept without one. The number and
+/// the security code travel no further than the request body, and are kept
+/// out of <see cref="ToString"/> so they never reach a log: the gateway keeps
+/// only the head and the tail digits of the number and no digit of the code.
 /// </summary>
 public sealed class Card
 {
     public required string HolderName { get; init; }
 
-    /// <summary>The number, digits only, without spaces.</summary>
+    /// <summary>The number, 12 to 19 digits; it may be written in groups with spaces.</summary>
     public required string Number { get; init; }
 
     /// <summary>
-    /// The security code. Only a card kept with <c>SaveCardAsync</c> at a
-    /// provider with a card store of its own may leave it out.
+    /// Three or four digits. A payment always needs it. A card kept without a
+    /// payment needs it only at providers that keep a card by charging and
+    /// giving back a small amount; left out, it is not sent.
     /// </summary>
     public string? SecurityCode { get; init; }
 
@@ -28,12 +29,14 @@ public sealed class Card
     public required string ExpiryYear { get; init; }
 
     /// <summary>
-    /// Whether the customer asked for this card to be kept, so they can pay
-    /// with it again without typing it out. The account's provider has to be
-    /// able to charge a kept card; one that cannot turns the payment down on
-    /// this field rather than declining it.
+    /// Whether the customer asked for this card to be kept after a successful
+    /// payment, so they can pay with it again without typing it out. Needs a
+    /// customer reference to be kept under, a plan that covers saved cards and
+    /// an account whose provider keeps cards; one that cannot turns the
+    /// payment down on this field rather than declining it. Read only by
+    /// payments; left out, it is not sent.
     /// </summary>
-    public bool ShouldSave { get; init; }
+    public bool? ShouldSave { get; init; }
 
     internal JsonObject ToBody()
     {

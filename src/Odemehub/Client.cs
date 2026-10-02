@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -18,6 +19,11 @@ namespace Odemehub;
 /// it, so both sides can tell the other is really who it says it is.
 /// </summary>
 /// <remarks>
+/// There is one method per endpoint, named after it: <c>create-order</c> is
+/// <c>CreateOrderAsync</c>, and takes a <c>Requests.CreateOrder</c>. The
+/// channel the merchant speaks for is named once, on the options, and put
+/// into each request wherever that endpoint expects it.
+///
 /// A client holds no state beyond its options, so one can be shared across
 /// the application for its whole life, e.g. registered as a singleton.
 /// </remarks>
@@ -45,7 +51,8 @@ public sealed class Client
     /// <summary>
     /// Start a payment the customer confirms with their bank. A successful
     /// answer is not a settled payment: the customer is still to be sent to
-    /// the address it comes back with.
+    /// the address it comes back with, and <see cref="RetrievePaymentAsync"/>
+    /// says what became of it once they are back.
     /// </summary>
     public async Task<Responses.SecurePayment> SecurePaymentAsync(Requests.SecurePayment payment, CancellationToken cancellationToken = default)
     {
@@ -59,25 +66,6 @@ public sealed class Client
     public async Task<Responses.RegularPayment> RegularPaymentAsync(Requests.RegularPayment payment, CancellationToken cancellationToken = default)
     {
         return new Responses.RegularPayment(await SendAsync(payment, cancellationToken).ConfigureAwait(false));
-    }
-
-    /// <summary>
-    /// Open an order to be paid on the gateway's own page, and get back the
-    /// address to send the customer to.
-    /// </summary>
-    public async Task<Order> OrderPaymentAsync(Requests.OrderPayment orderPayment, CancellationToken cancellationToken = default)
-    {
-        return new Order(await SendAsync(orderPayment, cancellationToken).ConfigureAwait(false));
-    }
-
-    /// <summary>
-    /// Open a subscription. The customer is sent to the address it comes back
-    /// with and pays there, and the periods after that are taken from the
-    /// card they pay with.
-    /// </summary>
-    public async Task<Subscription> SubscriptionPaymentAsync(SubscriptionPayment subscription, CancellationToken cancellationToken = default)
-    {
-        return new Subscription(await SendAsync(subscription, cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>
@@ -100,9 +88,10 @@ public sealed class Client
     }
 
     /// <summary>
-    /// How a payment went. A customer sent to their bank comes back to the
-    /// merchant with the payment's token and a hint at how it went; the hint
-    /// is worth nothing on its own, and this call says what really became of it.
+    /// How a payment went, by its token. A customer sent to their bank comes
+    /// back to the merchant with the payment's token and a hint at how it
+    /// went; the hint is worth nothing on its own, and this call says what
+    /// really became of it.
     /// </summary>
     public async Task<Responses.Payment> RetrievePaymentAsync(RetrievePayment payment, CancellationToken cancellationToken = default)
     {
@@ -110,179 +99,277 @@ public sealed class Client
     }
 
     /// <summary>
-    /// Ask what the gateway's provider knows about a card by the head of its
-    /// number, and how an amount may be paid off on it. Nothing is charged and
-    /// nothing is written down.
+    /// How the latest payment under one of the merchant's own references went,
+    /// for the merchant that started a payment and never heard back.
     /// </summary>
-    /// <summary>
-    /// Every attempt made under one of the merchant's own numbers on a channel,
-    /// oldest first: how many times the customer tried, which were refused and
-    /// which went through.
-    /// </summary>
-    public async Task<Transactions> RetrieveTransactionsAsync(RetrieveTransactions transactions, CancellationToken cancellationToken = default)
+    public async Task<Responses.Payment> RetrievePaymentByReferenceAsync(RetrievePaymentByReference payment, CancellationToken cancellationToken = default)
     {
-        return new Transactions(await SendAsync(transactions, cancellationToken).ConfigureAwait(false));
+        return new Responses.Payment(await SendAsync(payment, cancellationToken).ConfigureAwait(false));
     }
 
+    /// <summary>
+    /// Every payment attempt on a channel within a span of days, oldest first,
+    /// with each one's state, amount and what became of its money.
+    /// </summary>
+    public async Task<PaymentList> RetrievePaymentsByChannelReferenceAsync(RetrievePaymentsByChannelReference payments, CancellationToken cancellationToken = default)
+    {
+        return new PaymentList(await SendAsync(payments, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Ask what is known about a card from the head of its number, and how an
+    /// amount may be paid off on it. Nothing is charged and nothing is written
+    /// down.
+    /// </summary>
     public async Task<Bin> RetrieveBinAsync(RetrieveBin retrieveBin, CancellationToken cancellationToken = default)
     {
         return new Bin(await SendAsync(retrieveBin, cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>
-    /// Save a product in the merchant's catalogue at the gateway, or change the
-    /// one already saved under the same key on the same channel. Order lines
-    /// and subscriptions name products by key.
+    /// Open an order to be paid on the gateway's own page, or overwrite the
+    /// open one already under the same reference. Nothing is charged here; the
+    /// customer is sent to the address that comes back and pays there.
     /// </summary>
-    public async Task<Product> SaveProductAsync(SaveProduct product, CancellationToken cancellationToken = default)
+    public async Task<OrderDetails> CreateOrderAsync(CreateOrder order, CancellationToken cancellationToken = default)
     {
-        return new Product(await SendAsync(product, cancellationToken).ConfigureAwait(false));
+        return new OrderDetails(await SendAsync(order, cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>
-    /// Where a subscription stands: what it is for, the period it is on and
-    /// whether that period has been paid for.
+    /// Where an order stands, by its token: what it is for, whether it has
+    /// been paid and, if so, by which payment.
     /// </summary>
-    /// <summary>
-    /// Where an order stands: what it is for, whether it has been paid and, if
-    /// so, by which payment. The one call a merchant holding nothing but the
-    /// order's token can make.
-    /// </summary>
-    public async Task<Order> RetrieveOrderAsync(RetrieveOrder order, CancellationToken cancellationToken = default)
+    public async Task<OrderDetails> RetrieveOrderAsync(RetrieveOrder order, CancellationToken cancellationToken = default)
     {
-        return new Order(await SendAsync(order, cancellationToken).ConfigureAwait(false));
-    }
-
-    public async Task<Subscription> RetrieveSubscriptionAsync(RetrieveSubscription subscription, CancellationToken cancellationToken = default)
-    {
-        return new Subscription(await SendAsync(subscription, cancellationToken).ConfigureAwait(false));
+        return new OrderDetails(await SendAsync(order, cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>
-    /// Call a subscription off. Nothing is given back: the customer keeps the
-    /// days they already paid for and is served to the end of them, and
-    /// nothing is charged after that.
+    /// Where the latest order under one of the merchant's own numbers stands.
     /// </summary>
-    public async Task<Subscription> CancelSubscriptionAsync(CancelSubscription subscription, CancellationToken cancellationToken = default)
+    public async Task<OrderDetails> RetrieveOrderByReferenceAsync(RetrieveOrderByReference order, CancellationToken cancellationToken = default)
     {
-        return new Subscription(await SendAsync(subscription, cancellationToken).ConfigureAwait(false));
+        return new OrderDetails(await SendAsync(order, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Every order opened on a channel within a span of days, oldest first.
+    /// </summary>
+    public async Task<OrderList> RetrieveOrdersByChannelReferenceAsync(RetrieveOrdersByChannelReference orders, CancellationToken cancellationToken = default)
+    {
+        return new OrderList(await SendAsync(orders, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Change an open order. Only what is sent is written.
+    /// </summary>
+    public async Task<OrderDetails> UpdateOrderAsync(UpdateOrder order, CancellationToken cancellationToken = default)
+    {
+        return new OrderDetails(await SendAsync(order, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Open a payment link, or overwrite the one already under the same
+    /// reference. The address that comes back is the link itself.
+    /// </summary>
+    public async Task<PaymentLinkDetails> CreatePaymentLinkAsync(CreatePaymentLink link, CancellationToken cancellationToken = default)
+    {
+        return new PaymentLinkDetails(await SendAsync(link, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// A payment link as it stands, by its token, with how many payments were
+    /// made on it and the latest fifty of them.
+    /// </summary>
+    public async Task<PaymentLinkDetails> RetrievePaymentLinkAsync(RetrievePaymentLink link, CancellationToken cancellationToken = default)
+    {
+        return new PaymentLinkDetails(await SendAsync(link, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// A payment link as it stands, by the merchant's own reference for it.
+    /// </summary>
+    public async Task<PaymentLinkDetails> RetrievePaymentLinkByReferenceAsync(RetrievePaymentLinkByReference link, CancellationToken cancellationToken = default)
+    {
+        return new PaymentLinkDetails(await SendAsync(link, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Every payment link opened on a channel within a span of days, oldest
+    /// first.
+    /// </summary>
+    public async Task<PaymentLinkList> RetrievePaymentLinksByChannelReferenceAsync(RetrievePaymentLinksByChannelReference links, CancellationToken cancellationToken = default)
+    {
+        return new PaymentLinkList(await SendAsync(links, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Change a payment link: its lines, its last day, whether it takes
+    /// payments. Only what is sent is written.
+    /// </summary>
+    public async Task<PaymentLinkDetails> UpdatePaymentLinkAsync(UpdatePaymentLink link, CancellationToken cancellationToken = default)
+    {
+        return new PaymentLinkDetails(await SendAsync(link, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Open a subscription, its first renewal to be paid on the gateway's own
+    /// page and the rest taken from the card kept then; or overwrite the one
+    /// already under the same reference while nothing has been paid on it.
+    /// </summary>
+    public async Task<SubscriptionDetails> CreateSubscriptionAsync(CreateSubscription subscription, CancellationToken cancellationToken = default)
+    {
+        return new SubscriptionDetails(await SendAsync(subscription, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Where a subscription stands, by its token.
+    /// </summary>
+    public async Task<SubscriptionDetails> RetrieveSubscriptionAsync(RetrieveSubscription subscription, CancellationToken cancellationToken = default)
+    {
+        return new SubscriptionDetails(await SendAsync(subscription, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Where the latest subscription under one of the merchant's own keys
+    /// stands.
+    /// </summary>
+    public async Task<SubscriptionDetails> RetrieveSubscriptionByReferenceAsync(RetrieveSubscriptionByReference subscription, CancellationToken cancellationToken = default)
+    {
+        return new SubscriptionDetails(await SendAsync(subscription, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Every subscription opened on a channel within a span of days, oldest
+    /// first.
+    /// </summary>
+    public async Task<SubscriptionList> RetrieveSubscriptionsByChannelReferenceAsync(RetrieveSubscriptionsByChannelReference subscriptions, CancellationToken cancellationToken = default)
+    {
+        return new SubscriptionList(await SendAsync(subscriptions, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Change a subscription, or call it off with the status <c>cancelled</c>.
+    /// Only what is sent is written. Nothing is given back on a cancellation:
+    /// the customer is served to the end of what they paid for, and nothing
+    /// is charged after that.
+    /// </summary>
+    public async Task<SubscriptionDetails> UpdateSubscriptionAsync(UpdateSubscription subscription, CancellationToken cancellationToken = default)
+    {
+        return new SubscriptionDetails(await SendAsync(subscription, cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>
     /// Keep a card for a customer without making a payment on it.
     /// </summary>
-    public async Task<KeptCard> SaveCardAsync(SaveCard saveCard, CancellationToken cancellationToken = default)
+    public async Task<SavedCardDetails> CreateSavedCardAsync(CreateSavedCard savedCard, CancellationToken cancellationToken = default)
     {
-        return new KeptCard(await SendAsync(saveCard, cancellationToken).ConfigureAwait(false));
+        return new SavedCardDetails(await SendAsync(savedCard, cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>
-    /// The cards a customer let the merchant keep, the default one first.
+    /// One kept card, by its token.
     /// </summary>
-    public async Task<KeptCards> SavedCardsAsync(SavedCards savedCards, CancellationToken cancellationToken = default)
+    public async Task<SavedCardDetails> RetrieveSavedCardAsync(RetrieveSavedCard savedCard, CancellationToken cancellationToken = default)
     {
-        return new KeptCards(await SendAsync(savedCards, cancellationToken).ConfigureAwait(false));
+        return new SavedCardDetails(await SendAsync(savedCard, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// The cards kept for a customer, by the merchant's own key for them.
+    /// </summary>
+    public async Task<SavedCardList> RetrieveSavedCardsByReferenceAsync(RetrieveSavedCardsByReference savedCards, CancellationToken cancellationToken = default)
+    {
+        return new SavedCardList(await SendAsync(savedCards, cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>
     /// Make one of a customer's kept cards the one they pay with unless they
     /// say otherwise.
     /// </summary>
-    public async Task<KeptCard> DefaultSavedCardAsync(DefaultSavedCard defaultSavedCard, CancellationToken cancellationToken = default)
+    public async Task<SavedCardDetails> UpdateSavedCardAsync(UpdateSavedCard savedCard, CancellationToken cancellationToken = default)
     {
-        return new KeptCard(await SendAsync(defaultSavedCard, cancellationToken).ConfigureAwait(false));
+        return new SavedCardDetails(await SendAsync(savedCard, cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>
-    /// Let go of one of a customer's kept cards, at the provider and here.
+    /// Let go of a kept card, at the provider and here.
     /// </summary>
-    public async Task<KeptCard> DeleteSavedCardAsync(DeleteSavedCard deleteSavedCard, CancellationToken cancellationToken = default)
+    public async Task<DeletedSavedCard> DeleteSavedCardAsync(DeleteSavedCard savedCard, CancellationToken cancellationToken = default)
     {
-        return new KeptCard(await SendAsync(deleteSavedCard, cancellationToken).ConfigureAwait(false));
+        return new DeletedSavedCard(await SendAsync(savedCard, cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>
-    /// Read the word the gateway sent about a subscription: posted to the
-    /// address the subscription was opened with, as plain JSON signed in the
-    /// <c>X-Signature</c> header. Hand it the body exactly as it arrived, byte
-    /// for byte, together with the header; nothing in it is to be believed
-    /// until the signature holds.
+    /// Read a word the gateway posted to one of the merchant's webhook
+    /// addresses. Hand it the request exactly as it arrived — the method, the
+    /// path of the address it came to (without the query string), the raw body
+    /// byte for byte and the two headers — and nothing in it is believed until
+    /// the signature is checked against the secret.
     /// </summary>
+    /// <remarks>
+    /// The word only names what it is about; ask the gateway what became of it
+    /// before acting on it. Answer with any 2xx once the word is taken; the
+    /// gateway tries again, up to five times, until it hears one.
+    /// </remarks>
     /// <exception cref="SignatureException">When the signature does not hold.</exception>
-    public Responses.SubscriptionWebhook SubscriptionWebhook(byte[] payload, string? signature)
+    public Responses.Webhook Webhook(string method, string path, byte[] payload, string? timestamp, string? signature)
     {
-        return new Responses.SubscriptionWebhook(Webhook(payload, signature));
-    }
-
-    public Responses.SubscriptionWebhook SubscriptionWebhook(string payload, string? signature)
-    {
-        return SubscriptionWebhook(Encoding.UTF8.GetBytes(payload), signature);
-    }
-
-    /// <summary>
-    /// Read the word the gateway sent about an order: that it was paid, with
-    /// the payment that paid it. Posted to the address the order was opened
-    /// with and read the way a subscription's word is.
-    /// </summary>
-    /// <exception cref="SignatureException">When the signature does not hold.</exception>
-    public OrderWebhook OrderWebhook(byte[] payload, string? signature)
-    {
-        return new OrderWebhook(Webhook(payload, signature));
-    }
-
-    public OrderWebhook OrderWebhook(string payload, string? signature)
-    {
-        return OrderWebhook(Encoding.UTF8.GetBytes(payload), signature);
-    }
-
-    /// <summary>
-    /// Read the word the gateway sent about a payment the customer finished at
-    /// their bank: the same answer <c>RetrievePaymentAsync</c> gives, with the
-    /// state reached on top. Posted to the address the payment was started
-    /// with and read the way a subscription's word is.
-    /// </summary>
-    /// <exception cref="SignatureException">When the signature does not hold.</exception>
-    public TransactionWebhook TransactionWebhook(byte[] payload, string? signature)
-    {
-        return new TransactionWebhook(Webhook(payload, signature));
-    }
-
-    public TransactionWebhook TransactionWebhook(string payload, string? signature)
-    {
-        return TransactionWebhook(Encoding.UTF8.GetBytes(payload), signature);
-    }
-
-    /// <summary>
-    /// Check a word's signature and open it. Nothing in it is believed until
-    /// the signature holds.
-    /// </summary>
-    private JsonElement Webhook(byte[] payload, string? signature)
-    {
-        if (!_signature.Verify(payload, signature))
+        if (!VerifyWebhook(method, path, payload, timestamp, signature))
         {
             throw new SignatureException("Bildirimin imzası doğrulanamadı; bildirim ödeme geçidinden gelmemiş olabilir.");
         }
 
-        return Decode(payload, 0);
+        return new Responses.Webhook(Decode(payload, 0));
+    }
+
+    public Responses.Webhook Webhook(string method, string path, string payload, string? timestamp, string? signature)
+    {
+        return Webhook(method, path, Encoding.UTF8.GetBytes(payload), timestamp, signature);
+    }
+
+    /// <summary>
+    /// Whether a word that arrived at a webhook address was signed by the
+    /// gateway with this team's secret, recently enough to be taken. The path
+    /// is the address's own, with its leading slash and without the query
+    /// string; the body is the raw bytes as they arrived.
+    /// </summary>
+    public bool VerifyWebhook(string method, string path, byte[] payload, string? timestamp, string? signature)
+    {
+        return _signature.Verify(method, path, payload, timestamp, signature);
+    }
+
+    public bool VerifyWebhook(string method, string path, string payload, string? timestamp, string? signature)
+    {
+        return VerifyWebhook(method, path, Encoding.UTF8.GetBytes(payload), timestamp, signature);
     }
 
     /// <summary>
     /// Sign what is being asked for, hand it to the gateway and read the answer
     /// back. The body is signed exactly as it is sent, byte for byte, so it is
-    /// written once and used for both.
+    /// written once and used for both; a GET sends no body and signs the empty
+    /// string.
     /// </summary>
     private async Task<JsonElement> SendAsync(Message message, CancellationToken cancellationToken)
     {
-        var body = Encoding.UTF8.GetBytes(message.ToBody(_options.ChannelToken).ToJsonString(Fields.Json));
+        var method = message.Method;
+        var path = _options.Path(message.Path);
+        var body = method == "GET" ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(message.ToBody(_options.ChannelToken).ToJsonString(Fields.Json));
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, _options.Url(message.Path))
+        using var request = new HttpRequestMessage(new HttpMethod(method), _options.Url(message.Path));
+
+        if (method != "GET")
         {
-            Content = new ByteArrayContent(body),
-        };
-        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+            request.Content = new ByteArrayContent(body);
+            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        }
+
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         request.Headers.Add(Options.ApiKeyHeader, _options.ApiKey);
-        request.Headers.Add(Signature.Header, _signature.Sign(body));
+        request.Headers.Add(Signature.TimestampHeader, timestamp.ToString(CultureInfo.InvariantCulture));
+        request.Headers.Add(Signature.Header, _signature.Sign(method, path, body, timestamp));
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(_options.Timeout);
@@ -290,13 +377,17 @@ public sealed class Client
         int status;
         byte[] payload;
         string? signature;
+        string? signedAt;
+        string? retryAfter;
 
         try
         {
             using var response = await _http.SendAsync(request, timeout.Token).ConfigureAwait(false);
             status = (int)response.StatusCode;
             payload = await response.Content.ReadAsByteArrayAsync(timeout.Token).ConfigureAwait(false);
-            signature = response.Headers.TryGetValues(Signature.Header, out var values) ? values.FirstOrDefault() : null;
+            signature = Header(response, Signature.Header);
+            signedAt = Header(response, Signature.TimestampHeader);
+            retryAfter = Header(response, "Retry-After");
         }
         catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
@@ -307,25 +398,39 @@ public sealed class Client
             throw new TransportException("Ödeme geçidine ulaşılamadı: " + exception.Message, exception);
         }
 
-        return ReadAnswer(status, payload, string.IsNullOrEmpty(signature) ? null : signature);
+        return ReadAnswer(status, payload, method, path, signedAt, signature, retryAfter);
+    }
+
+    /// <summary>
+    /// A header of the answer, or nothing when it did not carry it.
+    /// </summary>
+    private static string? Header(HttpResponseMessage response, string name)
+    {
+        var value = response.Headers.TryGetValues(name, out var values) ? values.FirstOrDefault() : null;
+
+        return string.IsNullOrEmpty(value) ? null : value;
     }
 
     /// <summary>
     /// Read the answer. An outcome is answered with 200 and signed, however the
     /// payment itself turned out: a payment the provider declined is an
-    /// outcome like any other and comes back rather than being thrown.
+    /// outcome like any other and comes back rather than being thrown. The
+    /// signature is checked over the method and the path of the request and
+    /// the answer's own moment and body.
     /// </summary>
     /// <remarks>
     /// Anything else is a refusal — the request never became a payment — and
-    /// the status says which kind. The gateway signs some of those too, but a
+    /// the status says which kind: 401 credentials, 403 what the team may not
+    /// do, 404 a record that is not the team's, 422 the fields, 429 too many
+    /// requests in a minute. The gateway signs some of those too, but a
     /// signature does not make a refusal an outcome, so the status is read
     /// first.
     /// </remarks>
-    private JsonElement ReadAnswer(int status, byte[] payload, string? signature)
+    private JsonElement ReadAnswer(int status, byte[] payload, string method, string path, string? signedAt, string? signature, string? retryAfter)
     {
         if (status == 200)
         {
-            if (!_signature.Verify(payload, signature))
+            if (!_signature.Verify(method, path, payload, signedAt, signature))
             {
                 throw new SignatureException("Yanıtın imzası doğrulanamadı; yanıt ödeme geçidinden gelmemiş olabilir.");
             }
@@ -340,7 +445,10 @@ public sealed class Client
         throw status switch
         {
             401 => new AuthenticationException(message),
+            403 => new ForbiddenException(message),
+            404 => new NotFoundException(message),
             422 => new ValidationException(message, RefusalErrors(body, result)),
+            429 => new RateLimitException(message, int.TryParse(retryAfter, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds) ? seconds : null),
             _ => new UnexpectedResponseException(message, status),
         };
     }

@@ -1,8 +1,9 @@
 namespace Odemehub;
 
 /// <summary>
-/// The gateway answered with something that is neither a payment outcome nor
-/// a refusal this client knows how to read.
+/// The gateway answered with something that is neither an outcome nor a
+/// refusal this client has a type of its own for: something that went wrong
+/// on the gateway's side (500), or an answer that could not be read.
 /// </summary>
 public class UnexpectedResponseException : OdemehubException
 {
