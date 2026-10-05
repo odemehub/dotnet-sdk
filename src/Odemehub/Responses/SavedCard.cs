@@ -23,6 +23,7 @@ public sealed record SavedCard
         ExpiryYear = Read.String(card.Field("expiry_year"));
         IsDefault = Read.Bool(card.Field("is_default"));
         CreatedAt = Read.NonEmptyString(card.Field("created_at"));
+        Customer = card.Field("customer").ValueKind == JsonValueKind.Object ? new SavedCardCustomer(card.Field("customer")) : null;
     }
 
     /// <summary>The card's token in the gateway, which names it again later.</summary>
@@ -49,6 +50,9 @@ public sealed record SavedCard
     public bool IsDefault { get; }
 
     public string? CreatedAt { get; }
+
+    /// <summary>Who the card is kept for; listed cards only, the other answers carry it beside the card.</summary>
+    public SavedCardCustomer? Customer { get; }
 }
 
 /// <summary>
@@ -66,7 +70,7 @@ public sealed record SavedCardCustomer
 }
 
 /// <summary>
-/// A card kept, made the default or asked after.
+/// A card kept or made the default.
 /// </summary>
 public sealed record SavedCardDetails
 {
@@ -89,25 +93,33 @@ public sealed record SavedCardDetails
 }
 
 /// <summary>
-/// The cards a customer let the merchant keep.
+/// Kept cards asked after, each with the customer it is kept for. A customer's
+/// cards come with the one they pay with by default first. The answer is always a list, oldest first, and an empty one when
+/// nothing matched. The days are the ones the gateway used, when the records
+/// were asked for by the days they were made on: the ones asked for, or the
+/// last seven when none were.
 /// </summary>
 public sealed record SavedCardList
 {
     internal SavedCardList(JsonElement body)
     {
         Result = new Result(body);
-        SavedCards = Read.List(body.Field("saved_cards"), card => new SavedCard(card));
-        Customer = new SavedCardCustomer(body.Field("customer"));
+        CreatedFrom = Read.NonEmptyString(body.Field("created_from"));
+        CreatedTo = Read.NonEmptyString(body.Field("created_to"));
+        SavedCards = Read.List(body.Field("saved_cards"), entry => new SavedCard(entry));
     }
 
     public Result Result { get; }
 
+    /// <summary>The first day listed, as <c>YYYY-MM-DD</c> in the team's timezone; null when they were asked for by token or reference.</summary>
+    public string? CreatedFrom { get; }
+
+    /// <summary>The last day listed, the same way.</summary>
+    public string? CreatedTo { get; }
+
     public IReadOnlyList<SavedCard> SavedCards { get; }
 
-    /// <summary>The customer the cards belong to.</summary>
-    public SavedCardCustomer Customer { get; }
-
-    /// <summary>The card the customer pays with unless they say otherwise; null when they have none.</summary>
+    /// <summary>The card the customer pays with unless they say otherwise, when the cards were asked for by the customer's reference.</summary>
     public SavedCard? Default => SavedCards.FirstOrDefault(card => card.IsDefault);
 }
 

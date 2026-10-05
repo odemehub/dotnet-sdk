@@ -113,8 +113,7 @@ public sealed record PaymentTransaction
     internal PaymentTransaction(JsonElement transaction)
     {
         Token = Read.String(transaction.Field("token"));
-        ChannelToken = Read.String(transaction.Field("channel_token"));
-        ChannelReference = Read.String(transaction.Field("channel_reference"));
+        Reference = Read.String(transaction.Field("reference"));
         Status = Read.OptionalEnum<TransactionStatus>(transaction.Field("status"));
         PaymentStatus = Read.OptionalEnum<PaymentStatus>(transaction.Field("payment_status"));
         SecurityType = Read.OptionalEnum<SecurityType>(transaction.Field("security_type"));
@@ -132,11 +131,9 @@ public sealed record PaymentTransaction
     /// <summary>The payment's token in the gateway, which names it again to ask after it or give money back.</summary>
     public string Token { get; }
 
-    /// <summary>The channel the payment came in on.</summary>
-    public string ChannelToken { get; }
 
     /// <summary>The reference the payment is known by in the calling system.</summary>
-    public string ChannelReference { get; }
+    public string Reference { get; }
 
     /// <summary>The attempt's state.</summary>
     public TransactionStatus? Status { get; }

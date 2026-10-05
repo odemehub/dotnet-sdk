@@ -9,18 +9,18 @@ namespace Odemehub.Requests;
 /// gateway's own checkout page and the rest taken from the card kept then.
 /// The answer carries the checkout address; the customer is sent there, pays
 /// with a card the gateway keeps as their default, and is posted back to
-/// <see cref="SuccessUrl"/>. The addresses set for its channel under Webhook
-/// in the panel hear every change of state after that.
+/// <see cref="SuccessUrl"/>. The addresses the team set under Webhook in the
+/// panel hear every change of state after that.
 /// </summary>
 /// <remarks>
-/// The customer needs a reference, because that is what the card the renewals
-/// are taken from is kept under. The account, named or default, has to keep
+/// The customer needs a reference: the card the renewals are taken from is
+/// kept for the team's customer under it. The account, named or default, has to keep
 /// cards and take 3D payments, and the plan has to cover saved cards.
 /// </remarks>
 public sealed class CreateSubscription : CheckoutMessage
 {
     /// <summary>The key the subscription is known by in the calling system. Has to carry at least one digit.</summary>
-    public required string ChannelReference { get; init; }
+    public required string Reference { get; init; }
 
     /// <summary>How often a renewal comes round.</summary>
     public required Period Period { get; init; }
@@ -43,9 +43,9 @@ public sealed class CreateSubscription : CheckoutMessage
 
     internal override string Path => "create-subscription";
 
-    internal override JsonObject ToBody(string channelToken)
+    internal override JsonObject ToBody()
     {
-        var details = Details(Channel(channelToken), ChannelReference, SuccessUrl, Items);
+        var details = Details(Reference, SuccessUrl, Items);
         details["period"] = Wire.Of<Period>(Period);
 
         if (RenewalLimit is not null)
@@ -57,32 +57,8 @@ public sealed class CreateSubscription : CheckoutMessage
     }
 }
 
-/// <summary>
-/// Where a subscription stands, by its token: what it is for, the renewal it
-/// is on and whether that has been paid for.
-/// </summary>
-public sealed class RetrieveSubscription : RetrieveByToken
-{
-    internal override string Endpoint => "retrieve-subscription";
-}
 
-/// <summary>
-/// Where the latest subscription under one of the merchant's own keys on a
-/// channel stands.
-/// </summary>
-public sealed class RetrieveSubscriptionByReference : RetrieveByReference
-{
-    internal override string Path => "retrieve-subscription-by-reference";
-}
 
-/// <summary>
-/// Every subscription opened on a channel within a span of days, oldest
-/// first, each with whose it is.
-/// </summary>
-public sealed class RetrieveSubscriptionsByChannelReference : RetrieveByChannelReference
-{
-    internal override string Path => "retrieve-subscriptions-by-channel-reference";
-}
 
 /// <summary>
 /// A change to a subscription, named by its token in the address and again in
@@ -96,14 +72,10 @@ public sealed class RetrieveSubscriptionsByChannelReference : RetrieveByChannelR
 /// after that and nothing is given back; a renewal already paid is served to
 /// its end.
 ///
-/// Until its first payment anything about it may be changed. Once paid, what
-/// it renews on stays as it was opened — the channel, the customer's
-/// reference, the account, the currency and the period — and the gateway
-/// turns down a change to any of them (422). A renewal limit may not fall
-/// below the renewals already paid.
-///
-/// The channel is written only when this message names one; the client's own
-/// is not sent.
+/// Until its first payment anything about it may be changed. Once paid, only
+/// the status, the period, the renewal limit and the prices of the same lines
+/// may change; the gateway turns down anything else (422), the customer
+/// included. A renewal limit may not fall below the renewals already paid.
 /// </remarks>
 public sealed class UpdateSubscription : CheckoutMessage
 {
@@ -118,7 +90,7 @@ public sealed class UpdateSubscription : CheckoutMessage
     /// <summary>1 to 1000, and never fewer than the renewals already paid.</summary>
     public int? RenewalLimit { get; init; }
 
-    public string? ChannelReference { get; init; }
+    public string? Reference { get; init; }
 
     public string? SuccessUrl { get; init; }
 
@@ -136,9 +108,9 @@ public sealed class UpdateSubscription : CheckoutMessage
 
     internal override string Path => $"update-subscription/{Token}";
 
-    internal override JsonObject ToBody(string channelToken)
+    internal override JsonObject ToBody()
     {
-        var details = Details(ChannelToken, ChannelReference, SuccessUrl, Items);
+        var details = Details(Reference, SuccessUrl, Items);
 
         foreach (var (key, value) in new (string, JsonNode?)[] { ("period", Wire.Of(Period)), ("renewal_limit", RenewalLimit), ("status", Wire.Of(Status)) })
         {
@@ -150,4 +122,10 @@ public sealed class UpdateSubscription : CheckoutMessage
 
         return Body("subscription", Cleared(details, Clear), Customer, Token);
     }
+}
+
+/// <summary>Subscriptions asked after, each with its customer and the renewal it is on.</summary>
+public sealed class RetrieveSubscriptions : Retrieve
+{
+    internal override string Path => "retrieve-subscriptions";
 }

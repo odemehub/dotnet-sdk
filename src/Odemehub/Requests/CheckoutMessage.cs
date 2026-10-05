@@ -11,19 +11,20 @@ namespace Odemehub.Requests;
 /// </summary>
 /// <remarks>
 /// What it comes to is not sent. The gateway adds up the lines and the
-/// shipping method the payer picks and answers with the amount, so the total
+/// shipping method the payer picks from the team's own list and answers with
+/// the amount, so the total
 /// can never disagree with what it is made up of. The customer is whatever is
 /// known: it is filled in on the checkout page and the payer is asked for the
 /// rest.
 ///
-/// Opening is idempotent per channel and reference: opening again under a
+/// Opening is idempotent per reference: opening again under a
 /// reference that already has an open order or an unpaid subscription
 /// overwrites it with what is sent and answers with the one that was there,
 /// under its own token. A paid order, or a subscription that has been paid,
 /// is not touched, and neither is one with a payment under way — the gateway
-/// says so on <c>channel_reference</c>.
+/// says so on <c>reference</c>.
 /// </remarks>
-public abstract class CheckoutMessage : ChannelMessage
+public abstract class CheckoutMessage : Message
 {
     /// <summary>Where the customer goes if they turn back without paying; shown as a link on the checkout page.</summary>
     public string? CancelUrl { get; init; }
@@ -40,36 +41,31 @@ public abstract class CheckoutMessage : ChannelMessage
     /// </summary>
     public string? PaymentProviderToken { get; init; }
 
-    /// <summary>Whether the checkout page asks the payer where the goods go.</summary>
-    public bool? RequiresShippingAddress { get; init; }
-
     /// <summary>
-    /// How the goods may be sent, for the payer to pick from; up to twenty.
-    /// Sent on a change, they replace the ones there were, and an empty list
-    /// removes them all.
+    /// Whether the checkout page asks the payer where the goods go. One who
+    /// is picks a way of sending from the team's own list, of those that send
+    /// there, and its price is added to the amount.
     /// </summary>
-    public IReadOnlyList<ShippingMethod>? ShippingMethods { get; init; }
+    public bool? RequiresShipping { get; init; }
+
 
     /// <summary>
     /// The group's fields, with what the caller left unsaid left out.
     /// </summary>
-    /// <param name="channel">The channel to write; null to leave it as it is.</param>
-    /// <param name="channelReference">The reference, as the kind holds it.</param>
+    /// <param name="reference">The reference, as the kind holds it.</param>
     /// <param name="successUrl">The success address, as the kind holds it.</param>
     /// <param name="items">The lines, as the kind holds them; null for none sent.</param>
-    internal JsonObject Details(string? channel, string? channelReference, string? successUrl, IReadOnlyList<Item>? items)
+    internal JsonObject Details(string? reference, string? successUrl, IReadOnlyList<Item>? items)
     {
         return Fields.Said(
-            ("channel_token", channel),
-            ("channel_reference", channelReference),
+            ("reference", reference),
             ("description", Description),
             ("payment_provider_token", PaymentProviderToken),
             ("currency", Wire.Of(Currency)),
             ("success_url", successUrl),
             ("cancel_url", CancelUrl),
-            ("requires_shipping_address", RequiresShippingAddress),
-            ("items", Item.ToBody(items)),
-            ("shipping_methods", ShippingMethod.ToBody(ShippingMethods)));
+            ("requires_shipping", RequiresShipping),
+            ("items", Item.ToBody(items)));
     }
 
     /// <summary>

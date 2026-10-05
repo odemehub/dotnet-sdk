@@ -5,7 +5,7 @@ namespace Odemehub.Responses;
 /// <summary>
 /// A word the gateway sent about something of the merchant's: an order paid,
 /// a link paid, a subscription's state changed, a payment finished, money
-/// given back. It goes to the addresses set for the thing's channel under
+/// given back. It goes to the addresses the team set for the event under
 /// Webhook in the panel, as plain JSON signed the way every answer is.
 /// </summary>
 /// <remarks>

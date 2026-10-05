@@ -8,11 +8,12 @@ namespace Odemehub.Requests;
 /// are billed and, for goods, where those go.
 /// </summary>
 /// <remarks>
-/// The reference is what a kept card is held under, together with the
-/// channel; a payment that keeps its card, a card kept on its own and a
-/// subscription all need it, and a payment with a kept card has to name the
-/// reference the card was kept under. An order opened without one is given a
-/// <c>guest-…</c> reference by the gateway once somebody pays.
+/// The reference is what makes them one of the team's customers: the customer
+/// is written under it once a payment for them goes through, and their cards
+/// are kept for them and found again by it. It may be left out of a payment
+/// or an order, and the payer is then nobody the team keeps; but a payment
+/// that keeps its card, a card kept on its own and a subscription have to
+/// carry it.
 ///
 /// Payments and kept cards take the reference and the billing address only,
 /// the billing address whole; orders and subscriptions take any part of the

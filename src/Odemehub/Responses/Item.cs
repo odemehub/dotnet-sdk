@@ -10,7 +10,7 @@ public sealed record Item
 {
     internal Item(JsonElement item)
     {
-        ChannelReference = Read.NonEmptyString(item.Field("channel_reference"));
+        Reference = Read.NonEmptyString(item.Field("reference"));
         Name = Read.String(item.Field("name"));
         Image = Read.NonEmptyString(item.Field("image"));
         Quantity = Read.Int(item.Field("quantity"));
@@ -19,7 +19,7 @@ public sealed record Item
     }
 
     /// <summary>The merchant's own key for what is on the line; null when it gave none.</summary>
-    public string? ChannelReference { get; }
+    public string? Reference { get; }
 
     public string Name { get; }
 
@@ -36,20 +36,22 @@ public sealed record Item
 }
 
 /// <summary>
-/// One way the goods of an order or a subscription may be sent.
+/// The way the payer picked to have the goods sent, from the team's own list,
+/// as it was copied onto the order or the subscription. The amount includes
+/// the tax.
 /// </summary>
 public sealed record ShippingMethod
 {
     internal ShippingMethod(JsonElement method)
     {
-        Handle = Read.String(method.Field("handle"));
+        Reference = Read.String(method.Field("reference"));
         Title = Read.String(method.Field("title"));
         Amount = Read.String(method.Field("amount"));
         TaxRate = Read.String(method.Field("tax_rate"));
     }
 
-    /// <summary>The merchant's own key for it.</summary>
-    public string Handle { get; }
+    /// <summary>The merchant's own key for the way, on the team's list.</summary>
+    public string Reference { get; }
 
     /// <summary>What the payer sees.</summary>
     public string Title { get; }

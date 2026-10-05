@@ -27,13 +27,11 @@ public sealed record Order
         var transaction = order.Field("transaction");
 
         Token = Read.String(order.Field("token"));
-        ChannelToken = Read.String(order.Field("channel_token"));
-        ChannelReference = Read.String(order.Field("channel_reference"));
+        Reference = Read.String(order.Field("reference"));
         Description = Read.NonEmptyString(order.Field("description"));
         PaymentProviderToken = Read.NonEmptyString(order.Field("payment_provider_token"));
         Status = Read.Enum<OrderStatus>(order.Field("status"));
         Items = Read.List(order.Field("items"), item => new Item(item));
-        ShippingMethods = Read.List(order.Field("shipping_methods"), method => new ShippingMethod(method));
         ShippingMethod = shippingMethod.ValueKind == JsonValueKind.Object ? new ShippingMethod(shippingMethod) : null;
         Subtotal = Read.String(order.Field("subtotal"));
         ShippingAmount = Read.String(order.Field("shipping_amount"));
@@ -50,11 +48,9 @@ public sealed record Order
     /// <summary>The order's token in the gateway; name it to ask after or change it later.</summary>
     public string Token { get; }
 
-    /// <summary>The channel the order was opened on.</summary>
-    public string ChannelToken { get; }
 
     /// <summary>The number the order is known by in the calling system.</summary>
-    public string ChannelReference { get; }
+    public string Reference { get; }
 
     public string? Description { get; }
 
@@ -67,8 +63,6 @@ public sealed record Order
     /// <summary>What the order is made up of.</summary>
     public IReadOnlyList<Item> Items { get; }
 
-    /// <summary>The ways the goods may be sent, as the merchant offered them.</summary>
-    public IReadOnlyList<ShippingMethod> ShippingMethods { get; }
 
     /// <summary>The way the payer picked; null until they have, or when none was offered.</summary>
     public ShippingMethod? ShippingMethod { get; }
@@ -114,26 +108,23 @@ public sealed record TransactionReference
     internal TransactionReference(JsonElement transaction)
     {
         Token = Read.String(transaction.Field("token"));
-        ChannelToken = Read.String(transaction.Field("channel_token"));
-        ChannelReference = Read.String(transaction.Field("channel_reference"));
+        Reference = Read.String(transaction.Field("reference"));
         PaymentStatus = Read.OptionalEnum<PaymentStatus>(transaction.Field("payment_status"));
     }
 
     /// <summary>The payment's token in the gateway.</summary>
     public string Token { get; }
 
-    /// <summary>The channel the payment came in on.</summary>
-    public string ChannelToken { get; }
 
     /// <summary>The reference the payment was made under.</summary>
-    public string ChannelReference { get; }
+    public string Reference { get; }
 
     /// <summary>What became of the money: paid, cancelled, refunded, partially refunded.</summary>
     public PaymentStatus? PaymentStatus { get; }
 }
 
 /// <summary>
-/// An order opened, changed or asked after. Whose it is is said beside the
+/// An order opened or changed. Whose it is is said beside the
 /// order, as the answer says it, and on the order as well.
 /// </summary>
 public sealed record OrderDetails
@@ -154,26 +145,28 @@ public sealed record OrderDetails
 }
 
 /// <summary>
-/// Every order opened on a channel within a span of days, oldest first.
+/// Orders asked after, each with its customer on <c>Order.Customer</c>. The answer is always a list, oldest first, and an empty one when
+/// nothing matched. The days are the ones the gateway used, when the records
+/// were asked for by the days they were made on: the ones asked for, or the
+/// last seven when none were.
 /// </summary>
 public sealed record OrderList
 {
     internal OrderList(JsonElement body)
     {
         Result = new Result(body);
-        CreatedFrom = Read.String(body.Field("created_from"));
-        CreatedTo = Read.String(body.Field("created_to"));
-        Orders = Read.List(body.Field("orders"), order => new Order(order, order.Field("customer")));
+        CreatedFrom = Read.NonEmptyString(body.Field("created_from"));
+        CreatedTo = Read.NonEmptyString(body.Field("created_to"));
+        Orders = Read.List(body.Field("orders"), entry => new Order(entry, entry.Field("customer")));
     }
 
     public Result Result { get; }
 
-    /// <summary>The first day looked at, as <c>YYYY-MM-DD</c> in the team's timezone.</summary>
-    public string CreatedFrom { get; }
+    /// <summary>The first day listed, as <c>YYYY-MM-DD</c> in the team's timezone; null when they were asked for by token or reference.</summary>
+    public string? CreatedFrom { get; }
 
-    /// <summary>The last day looked at, the same way.</summary>
-    public string CreatedTo { get; }
+    /// <summary>The last day listed, the same way.</summary>
+    public string? CreatedTo { get; }
 
-    /// <summary>The orders, oldest first, each with whose it is.</summary>
     public IReadOnlyList<Order> Orders { get; }
 }

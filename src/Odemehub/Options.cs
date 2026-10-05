@@ -3,10 +3,9 @@ using System;
 namespace Odemehub;
 
 /// <summary>
-/// The address the gateway is reached at, the credentials it is reached with
-/// and the channel the caller speaks for. A credential pair belongs to a
-/// single team, and the team is part of the address, so a pair only ever
-/// opens its own team's endpoints.
+/// The address the gateway is reached at and the credentials it is reached
+/// with. A credential pair belongs to a single team, and the team is part of
+/// the address, so a pair only ever opens its own team's endpoints.
 /// </summary>
 public sealed class Options
 {
@@ -18,14 +17,6 @@ public sealed class Options
 
     /// <summary>The team the payments are made on behalf of: the ten-digit workspace id the Entegrasyon page shows.</summary>
     public required string Team { get; init; }
-
-    /// <summary>
-    /// The channel every request speaks for: the shop, the marketplace or the
-    /// branch the customer reached the merchant through, by the token the
-    /// team's own Kanallar page gives it. A merchant selling on more than one
-    /// channel may still name another on a single request.
-    /// </summary>
-    public required string ChannelToken { get; init; }
 
     public required string ApiKey { get; init; }
 
@@ -53,6 +44,6 @@ public sealed class Options
 
     public override string ToString()
     {
-        return $"Options {{ BaseUrl = {BaseUrl}, Team = {Team}, ChannelToken = {ChannelToken}, Timeout = {Timeout} }}";
+        return $"Options {{ BaseUrl = {BaseUrl}, Team = {Team}, Timeout = {Timeout} }}";
     }
 }

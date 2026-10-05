@@ -20,9 +20,7 @@ namespace Odemehub;
 /// </summary>
 /// <remarks>
 /// There is one method per endpoint, named after it: <c>create-order</c> is
-/// <c>CreateOrderAsync</c>, and takes a <c>Requests.CreateOrder</c>. The
-/// channel the merchant speaks for is named once, on the options, and put
-/// into each request wherever that endpoint expects it.
+/// <c>CreateOrderAsync</c>, and takes a <c>Requests.CreateOrder</c>.
 ///
 /// A client holds no state beyond its options, so one can be shared across
 /// the application for its whole life, e.g. registered as a singleton.
@@ -35,7 +33,7 @@ public sealed class Client
     private readonly HttpClient _http;
     private readonly Signature _signature;
 
-    /// <param name="options">The address, the credentials and the channel.</param>
+    /// <param name="options">The address and the credentials.</param>
     /// <param name="http">
     /// The HTTP client the requests go through, for a merchant that already
     /// configures one (IHttpClientFactory, a proxy). Left out, one shared
@@ -51,7 +49,7 @@ public sealed class Client
     /// <summary>
     /// Start a payment the customer confirms with their bank. A successful
     /// answer is not a settled payment: the customer is still to be sent to
-    /// the address it comes back with, and <see cref="RetrievePaymentAsync"/>
+    /// the address it comes back with, and <see cref="RetrievePaymentsAsync"/>
     /// says what became of it once they are back.
     /// </summary>
     public async Task<Responses.SecurePayment> SecurePaymentAsync(Requests.SecurePayment payment, CancellationToken cancellationToken = default)
@@ -88,30 +86,11 @@ public sealed class Client
     }
 
     /// <summary>
-    /// How a payment went, by its token. A customer sent to their bank comes
-    /// back to the merchant with the payment's token and a hint at how it
-    /// went; the hint is worth nothing on its own, and this call says what
-    /// really became of it.
+    /// Payments as they stand — by token, every attempt under one of the
+    /// merchant's own references, or the ones made between two days; the
+    /// refused ones included, oldest first.
     /// </summary>
-    public async Task<Responses.Payment> RetrievePaymentAsync(RetrievePayment payment, CancellationToken cancellationToken = default)
-    {
-        return new Responses.Payment(await SendAsync(payment, cancellationToken).ConfigureAwait(false));
-    }
-
-    /// <summary>
-    /// How the latest payment under one of the merchant's own references went,
-    /// for the merchant that started a payment and never heard back.
-    /// </summary>
-    public async Task<Responses.Payment> RetrievePaymentByReferenceAsync(RetrievePaymentByReference payment, CancellationToken cancellationToken = default)
-    {
-        return new Responses.Payment(await SendAsync(payment, cancellationToken).ConfigureAwait(false));
-    }
-
-    /// <summary>
-    /// Every payment attempt on a channel within a span of days, oldest first,
-    /// with each one's state, amount and what became of its money.
-    /// </summary>
-    public async Task<PaymentList> RetrievePaymentsByChannelReferenceAsync(RetrievePaymentsByChannelReference payments, CancellationToken cancellationToken = default)
+    public async Task<PaymentList> RetrievePaymentsAsync(RetrievePayments payments, CancellationToken cancellationToken = default)
     {
         return new PaymentList(await SendAsync(payments, cancellationToken).ConfigureAwait(false));
     }
@@ -137,26 +116,9 @@ public sealed class Client
     }
 
     /// <summary>
-    /// Where an order stands, by its token: what it is for, whether it has
-    /// been paid and, if so, by which payment.
+    /// Orders as they stand, each with its customer.
     /// </summary>
-    public async Task<OrderDetails> RetrieveOrderAsync(RetrieveOrder order, CancellationToken cancellationToken = default)
-    {
-        return new OrderDetails(await SendAsync(order, cancellationToken).ConfigureAwait(false));
-    }
-
-    /// <summary>
-    /// Where the latest order under one of the merchant's own numbers stands.
-    /// </summary>
-    public async Task<OrderDetails> RetrieveOrderByReferenceAsync(RetrieveOrderByReference order, CancellationToken cancellationToken = default)
-    {
-        return new OrderDetails(await SendAsync(order, cancellationToken).ConfigureAwait(false));
-    }
-
-    /// <summary>
-    /// Every order opened on a channel within a span of days, oldest first.
-    /// </summary>
-    public async Task<OrderList> RetrieveOrdersByChannelReferenceAsync(RetrieveOrdersByChannelReference orders, CancellationToken cancellationToken = default)
+    public async Task<OrderList> RetrieveOrdersAsync(RetrieveOrders orders, CancellationToken cancellationToken = default)
     {
         return new OrderList(await SendAsync(orders, cancellationToken).ConfigureAwait(false));
     }
@@ -179,27 +141,10 @@ public sealed class Client
     }
 
     /// <summary>
-    /// A payment link as it stands, by its token, with how many payments were
-    /// made on it and the latest fifty of them.
+    /// Payment links as they stand, each with the latest fifty payment attempts
+    /// made on it and how many there have been in all.
     /// </summary>
-    public async Task<PaymentLinkDetails> RetrievePaymentLinkAsync(RetrievePaymentLink link, CancellationToken cancellationToken = default)
-    {
-        return new PaymentLinkDetails(await SendAsync(link, cancellationToken).ConfigureAwait(false));
-    }
-
-    /// <summary>
-    /// A payment link as it stands, by the merchant's own reference for it.
-    /// </summary>
-    public async Task<PaymentLinkDetails> RetrievePaymentLinkByReferenceAsync(RetrievePaymentLinkByReference link, CancellationToken cancellationToken = default)
-    {
-        return new PaymentLinkDetails(await SendAsync(link, cancellationToken).ConfigureAwait(false));
-    }
-
-    /// <summary>
-    /// Every payment link opened on a channel within a span of days, oldest
-    /// first.
-    /// </summary>
-    public async Task<PaymentLinkList> RetrievePaymentLinksByChannelReferenceAsync(RetrievePaymentLinksByChannelReference links, CancellationToken cancellationToken = default)
+    public async Task<PaymentLinkList> RetrievePaymentLinksAsync(RetrievePaymentLinks links, CancellationToken cancellationToken = default)
     {
         return new PaymentLinkList(await SendAsync(links, cancellationToken).ConfigureAwait(false));
     }
@@ -224,27 +169,10 @@ public sealed class Client
     }
 
     /// <summary>
-    /// Where a subscription stands, by its token.
+    /// Subscriptions as they stand, each with its customer and the renewal it
+    /// is on.
     /// </summary>
-    public async Task<SubscriptionDetails> RetrieveSubscriptionAsync(RetrieveSubscription subscription, CancellationToken cancellationToken = default)
-    {
-        return new SubscriptionDetails(await SendAsync(subscription, cancellationToken).ConfigureAwait(false));
-    }
-
-    /// <summary>
-    /// Where the latest subscription under one of the merchant's own keys
-    /// stands.
-    /// </summary>
-    public async Task<SubscriptionDetails> RetrieveSubscriptionByReferenceAsync(RetrieveSubscriptionByReference subscription, CancellationToken cancellationToken = default)
-    {
-        return new SubscriptionDetails(await SendAsync(subscription, cancellationToken).ConfigureAwait(false));
-    }
-
-    /// <summary>
-    /// Every subscription opened on a channel within a span of days, oldest
-    /// first.
-    /// </summary>
-    public async Task<SubscriptionList> RetrieveSubscriptionsByChannelReferenceAsync(RetrieveSubscriptionsByChannelReference subscriptions, CancellationToken cancellationToken = default)
+    public async Task<SubscriptionList> RetrieveSubscriptionsAsync(RetrieveSubscriptions subscriptions, CancellationToken cancellationToken = default)
     {
         return new SubscriptionList(await SendAsync(subscriptions, cancellationToken).ConfigureAwait(false));
     }
@@ -269,17 +197,11 @@ public sealed class Client
     }
 
     /// <summary>
-    /// One kept card, by its token.
+    /// Kept cards — by token, every card of a customer by their reference, or
+    /// the ones kept between two days — each with its customer, the default
+    /// first.
     /// </summary>
-    public async Task<SavedCardDetails> RetrieveSavedCardAsync(RetrieveSavedCard savedCard, CancellationToken cancellationToken = default)
-    {
-        return new SavedCardDetails(await SendAsync(savedCard, cancellationToken).ConfigureAwait(false));
-    }
-
-    /// <summary>
-    /// The cards kept for a customer, by the merchant's own key for them.
-    /// </summary>
-    public async Task<SavedCardList> RetrieveSavedCardsByReferenceAsync(RetrieveSavedCardsByReference savedCards, CancellationToken cancellationToken = default)
+    public async Task<SavedCardList> RetrieveSavedCardsAsync(RetrieveSavedCards savedCards, CancellationToken cancellationToken = default)
     {
         return new SavedCardList(await SendAsync(savedCards, cancellationToken).ConfigureAwait(false));
     }
@@ -348,23 +270,19 @@ public sealed class Client
     /// <summary>
     /// Sign what is being asked for, hand it to the gateway and read the answer
     /// back. The body is signed exactly as it is sent, byte for byte, so it is
-    /// written once and used for both; a GET sends no body and signs the empty
-    /// string.
+    /// written once and used for both.
     /// </summary>
     private async Task<JsonElement> SendAsync(Message message, CancellationToken cancellationToken)
     {
         var method = message.Method;
         var path = _options.Path(message.Path);
-        var body = method == "GET" ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(message.ToBody(_options.ChannelToken).ToJsonString(Fields.Json));
+        var body = Encoding.UTF8.GetBytes(message.ToBody().ToJsonString(Fields.Json));
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
         using var request = new HttpRequestMessage(new HttpMethod(method), _options.Url(message.Path));
 
-        if (method != "GET")
-        {
-            request.Content = new ByteArrayContent(body);
-            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-        }
+        request.Content = new ByteArrayContent(body);
+        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         request.Headers.Add(Options.ApiKeyHeader, _options.ApiKey);

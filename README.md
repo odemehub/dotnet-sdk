@@ -2,7 +2,7 @@
 
 ödemehub ödeme geçidini kendi uygulamanızdan kullanmak için hazırlanmış .NET istemcisi. Kart çekmek, 3D ödeme başlatmak, sipariş, abonelik ve ödeme linki açmak, kart saklamak, iade ve iptal yapmak, taksit sormak: hepsi burada.
 
-İstemci her isteği gizli anahtarınızla imzalar, gelen her yanıtın imzasını doğrular. Siz imza, başlık ya da JSON ayrıntılarıyla uğraşmazsınız. Her uç nokta için bir metot vardır ve adı uç noktanın adıdır: `create-order` için `CreateOrderAsync()`, `retrieve-saved-cards-by-reference` için `RetrieveSavedCardsByReferenceAsync()`. Yalnızca .NET'in kendi `HttpClient`'ını ve `System.Text.Json`'ını kullanır; başka paket gerekmez.
+İstemci her isteği gizli anahtarınızla imzalar, gelen her yanıtın imzasını doğrular. Siz imza, başlık ya da JSON ayrıntılarıyla uğraşmazsınız. Her uç nokta için bir metot vardır ve adı uç noktanın adıdır: `create-order` için `CreateOrderAsync()`, `retrieve-saved-cards` için `RetrieveSavedCardsAsync()`. Yalnızca .NET'in kendi `HttpClient`'ını ve `System.Text.Json`'ını kullanır; başka paket gerekmez.
 
 ## Kurulum
 
@@ -14,7 +14,7 @@ dotnet add package Odemehub.Sdk
 
 ## Yapılandırma
 
-Dört bilgi gerekir. Hepsi paneldeki **Entegrasyon** sayfasındadır (menünün en altında): Çalışma Alanı Kimliğiniz, API anahtarı, gizli anahtar ve kanalınızın token'ı.
+Üç bilgi gerekir. Hepsi paneldeki **Entegrasyon** sayfasındadır (menünün en altında): Çalışma Alanı Kimliğiniz, API anahtarı ve gizli anahtar.
 
 ```csharp
 using Odemehub;
@@ -23,7 +23,6 @@ var client = new Client(new Options
 {
     BaseUrl = "https://app.odemehub.com",
     Team = "1000000001",                                   // Çalışma Alanı Kimliği
-    ChannelToken = "6f1c2e7a-4b3d-4c8e-9a61-2f5d7b0c3e14", // müşterinin size ulaştığı kanal
     ApiKey = Environment.GetEnvironmentVariable("ODEMEHUB_API_KEY")!,
     ApiSecret = Environment.GetEnvironmentVariable("ODEMEHUB_API_SECRET")!,
 });
@@ -31,7 +30,7 @@ var client = new Client(new Options
 
 Gizli anahtar hiçbir zaman tel üzerinden gitmez; yalnızca imza üretmekte ve doğrulamakta kullanılır. Anahtarları kodun içine yazmayın; ortam değişkeninde ya da gizli anahtar deposunda tutun.
 
-Kanal token'ı entegrasyon için bir kez verilir ve her isteğe istemci yazar. Birden çok kanalda satıyorsanız tek bir istekte `ChannelToken` vererek o isteği başka kanala yazdırabilirsiniz. Geçit hiçbir yerde veritabanı numarası kullanmaz: kanal, ödeme hesabı, işlem, sipariş, abonelik, link ve kayıtlı kart her zaman token'ıyla anılır.
+Geçit hiçbir yerde veritabanı numarası kullanmaz: ödeme hesabı, işlem, sipariş, abonelik, link ve kayıtlı kart her zaman token'ıyla anılır.
 
 İstemci durum tutmaz; uygulama boyunca tek bir nesneyi paylaşın (ASP.NET Core'da `builder.Services.AddSingleton(client)`). İstek bir dakika içinde yanıt almazsa kesilir; süreyi `Options.Timeout` ile değiştirebilirsiniz. Bütün metotlar `CancellationToken` alır. `IHttpClientFactory`'den aldığınız bir `HttpClient`'ı `new Client(options, httpClient)` ile verebilirsiniz.
 
@@ -41,7 +40,7 @@ Yanıtlar `Odemehub.Responses` ad alanındadır ve geçidin JSON'unu birebir yan
 
 ## İmza
 
-Her istek üç başlıkla gider: `X-Api-Key`, `X-Timestamp` (Unix saniye) ve `X-Signature`. İmza, `"{timestamp}\n{METHOD}\n{path}\n{body}"` metni üzerinden gizli anahtarla alınan HMAC-SHA256'nın küçük harfli hex hâlidir. `path` adresin sorgu dizesiz yolu (`/api/1000000001/gateway/regular-payment`), `body` gönderilen JSON'ın kendisidir; GET isteklerinde boş dizedir. Zaman damgası sunucu saatinden 5 dakikadan uzak olamaz; sunucunuzun saati kaymışsa istekler `AuthenticationException` ile döner. Geçit her yanıtı aynı yöntemle imzalar; istemci yanıtı isteğin metodu ve yoluyla, yanıtın kendi `X-Timestamp` değeriyle doğrular. Test vektörü en alttadır.
+Her istek üç başlıkla gider: `X-Api-Key`, `X-Timestamp` (Unix saniye) ve `X-Signature`. İmza, `"{timestamp}\n{METHOD}\n{path}\n{body}"` metni üzerinden gizli anahtarla alınan HMAC-SHA256'nın küçük harfli hex hâlidir. `path` adresin sorgu dizesiz yolu (`/api/1000000001/gateway/regular-payment`), `body` gönderilen JSON'ın kendisidir. Bütün uç noktalar POST'tur. Zaman damgası sunucu saatinden 5 dakikadan uzak olamaz; sunucunuzun saati kaymışsa istekler `AuthenticationException` ile döner. Geçit her yanıtı aynı yöntemle imzalar; istemci yanıtı isteğin metodu ve yoluyla, yanıtın kendi `X-Timestamp` değeriyle doğrular. Test vektörü en alttadır.
 
 ## Karttan doğrudan çekim
 
@@ -79,7 +78,7 @@ var card = new Card
 
 var payment = await client.RegularPaymentAsync(new RegularPayment
 {
-    ChannelReference = "SIP-10231",           // sizdeki referans; en az bir rakam içermeli
+    Reference = "SIP-10231",                  // sizdeki referans; en az bir rakam içermeli
     Amount = "450.00",
     InstallmentNumber = 1,
     Ip = httpContext.Connection.RemoteIpAddress!.ToString(),
@@ -98,6 +97,8 @@ Reddedilen ödeme de bir sonuçtur: `Result.IsSuccessful` false, `Result.Message
 
 Ödemede müşterinin fatura adresi (`BillingAddress`) sekiz alanıyla eksiksiz gönderilir; şirket adına alışverişte `CompanyTitle`, `TaxNumber` ve `TaxOffice` birlikte eklenir. Ödemeye gönderim adresi gönderilmez.
 
+**Müşteriler.** `Customer.Reference` gönderdiğiniz ödeme başarılı olunca geçit müşteriyi o referansla çalışma alanınızın müşteri listesine yazar ya da günceller; başarısız ödeme müşteriye dokunmaz. Referans göndermezseniz ödeme yine alınır ama müşteri kaydedilmez ve kart saklanamaz. Saklanan kart müşteriye bağlanır; müşterinin son ödeme yaptığı kart varsayılan kartı olur. Kayıtlı kartla ödemede `Customer.Reference` kartın saklandığı referansla aynı olmalıdır.
+
 Kayıtlı kartla ödemede `Card` yerine `SavedCardToken` verilir; ödeme kartın saklandığı hesaptan geçer, `PaymentProviderToken` gönderilmez. Kart hangi kanal ve müşteri referansıyla saklandıysa ödeme de aynılarını taşımalıdır.
 
 Tutarlar her zaman `string`'dir ve nokta ayraçlı, en çok iki ondalıklıdır: `"100"`, `"100.1"`, `"100.10"`; imzalanıp gönderildiği gibi kalır, yolda yuvarlanmaz. Tutar sıfırdan büyük ve en çok 10.000.000,00 olabilir. `Currency` (`Currency.TRY`, `USD`, `EUR`, `GBP`) boş bırakılırsa TRY'dir.
@@ -109,7 +110,7 @@ Siz ödemeyi başlatırsınız, müşteri bankasına gider, banka müşteriyi si
 ```csharp
 var payment = await client.SecurePaymentAsync(new SecurePayment
 {
-    ChannelReference = "SIP-10232",
+    Reference = "SIP-10232",
     Amount = "450.00",
     InstallmentNumber = 1,
     Ip = ip,
@@ -126,78 +127,74 @@ if (payment.Result.IsSuccessful)
 
 Başarılı yanıt **ödeme alındı demek değildir**; yalnızca müşterinin gideceği adres hazır demektir. Müşteriyi **15 dakika içinde** bu adrese yönlendirin; sayfası o süre içinde açılmayan ödemenin süresi dolar (`expired`).
 
-Banka işini bitirince müşterinin tarayıcısı `CallbackUrl` adresinize şu alanları POST eder: `transaction_token`, `channel_reference`, `successful` (`1` / `0`). Bu POST imzasızdır ve müşterinin tarayıcısından gelir; yalnızca ipucudur. Sonucu kendi imzalı bağlantınızdan sorun:
+Banka işini bitirince müşterinin tarayıcısı `CallbackUrl` adresinize şu alanları POST eder: `transaction_token`, `reference`, `successful` (`1` / `0`). Bu POST imzasızdır ve müşterinin tarayıcısından gelir; yalnızca ipucudur. Sonucu kendi imzalı bağlantınızdan sorun:
 
 ```csharp
 app.MapPost("/odeme/donus", async ([FromForm(Name = "transaction_token")] string transactionToken, Client client) =>
 {
-    var outcome = await client.RetrievePaymentAsync(new RetrievePayment { Token = transactionToken });
+    var payment = (await client.RetrievePaymentsAsync(new RetrievePayments { Token = transactionToken })).Payments.FirstOrDefault();
 
-    if (outcome.Result.IsSuccessful)
+    if (payment?.IsSuccessful == true)
     {
         // siparişi ödendi olarak işaretleyin
     }
 
-    outcome.Transaction.Status;          // TransactionStatus.Successful, Failed, Expired ...
-    outcome.Transaction.PaymentStatus;   // paranın akıbeti (sonradan Refunded olabilir)
-    outcome.Transaction.Amount;          // karttan çekilen tutar
+    // payment.Status: TransactionStatus.Successful, Failed, Expired ...
+    // payment.PaymentStatus: paranın akıbeti (sonradan Refunded olabilir)
+    // payment.Amount: karttan çekilen tutar
     // ...
 }).DisableAntiforgery();
 ```
 
-`successful` alanına bakıp sipariş kapatmayın — onu herkes gönderebilir. Geçide sorduğunuz yanıt ise her zaman imzalıdır ve SDK imzayı sizin için doğrular. Başkasının ya da hiç olmayan bir işlemi sorarsanız `NotFoundException` alırsınız.
+`successful` alanına bakıp sipariş kapatmayın — onu herkes gönderebilir. Geçide sorduğunuz yanıt ise her zaman imzalıdır ve SDK imzayı sizin için doğrular. Başkasının ya da hiç olmayan bir işlemi sorarsanız liste boş döner.
 
-Geçidin kendi ödeme yanıtları (`SecurePaymentAsync`, `RegularPaymentAsync`, `RefundPaymentAsync`, `CancelPaymentAsync`, `RetrievePaymentAsync`, `RetrievePaymentByReferenceAsync`) aynı şekli döner: `Result`, `Transaction` (`Token`, `ChannelToken`, `ChannelReference`, `Status`, `PaymentStatus`, `SecurityType`, `Amount`, `BaseAmount`, `Currency`, `InstallmentNumber`, `IsTest`, `CreatedAt`, ödeme bir siparişte, linkte ya da abonelikte alındıysa `OrderToken` / `PaymentLinkToken` / `SubscriptionToken`), `Customer` (`Reference` ve `BillingAddress`), `Conversion`, kart saklandıysa `SavedCard`; iade ve iptalde ayrıca `Refund`, 3D'de `RedirectUrl`.
+Geçidin ödeme yanıtları (`SecurePaymentAsync`, `RegularPaymentAsync`, `RefundPaymentAsync`, `CancelPaymentAsync`) aynı şekli döner: `Result`, `Transaction` (`Token`, `Reference`, `Status`, `PaymentStatus`, `SecurityType`, `Amount`, `BaseAmount`, `Currency`, `InstallmentNumber`, `IsTest`, `CreatedAt`, ödeme bir siparişte, linkte ya da abonelikte alındıysa `OrderToken` / `PaymentLinkToken` / `SubscriptionToken`), `Customer` (`Reference` ve `BillingAddress`), `Conversion`, kart saklandıysa `SavedCard`; iade ve iptalde ayrıca `Refund`, 3D'de `RedirectUrl`.
 
-Müşteri bankadan sonra sekmeyi kapatırsa tarayıcı `CallbackUrl` adresinize hiç dönmez; bunun için panelde kanala `transaction.*` webhook'u tanımlayın (bkz. [Webhook](#webhook)). Bildirim hiç gelmezse `RetrievePaymentByReferenceAsync()` ile sorabilirsiniz.
+Müşteri bankadan sonra sekmeyi kapatırsa tarayıcı `CallbackUrl` adresinize hiç dönmez; bunun için panelde `transaction.*` webhook'u tanımlayın (bkz. [Webhook](#webhook)). Bildirim hiç gelmezse `RetrievePaymentsAsync()` ile referansla sorabilirsiniz.
 
 ## Sipariş
 
-Kart sizde sorulmaz. Siparişi açarsınız, geçit kendi ödeme sayfasının adresini döner, müşteri orada öder. Tutar gönderilmez: geçit kalemleri ve seçilen gönderim yöntemini toplar. Birim tutarlar KDV dahildir (120 ve %20 → 100 mal + 20 KDV).
+Kart sizde sorulmaz. Siparişi açarsınız, geçit kendi ödeme sayfasının adresini döner, müşteri orada öder. Tutar gönderilmez: geçit kalemleri ve ödeyenin panelinizdeki listeden seçtiği gönderim yöntemini toplar. Birim tutarlar KDV dahildir (120 ve %20 → 100 mal + 20 KDV).
 
 ```csharp
 var created = await client.CreateOrderAsync(new CreateOrder
 {
-    ChannelReference = "SIP-10233",
+    Reference = "SIP-10233",
     SuccessUrl = "https://magazam.com/odeme/donus",
     Items =
     [
-        new Item { Name = "Kulaklık", UnitAmount = "1200.00", Quantity = 1, TaxRate = "20", ChannelReference = "SKU-1" },
+        new Item { Name = "Kulaklık", UnitAmount = "1200.00", Quantity = 1, TaxRate = "20", Reference = "SKU-1", SaveAsProduct = true },
         new Item { Name = "Hediye paketi", UnitAmount = "25.00", Quantity = 1, TaxRate = "20", Image = "https://magazam.com/img/paket.jpg" },
     ],
-    Customer = customer,                                   // bilinen kadarı; kalanı sayfada sorulur
-    ShippingMethods =
-    [
-        new ShippingMethod { Handle = "standart", Title = "Standart Kargo", Amount = "49.90", TaxRate = "20" },
-    ],
-    RequiresShippingAddress = true,
+    Customer = customer,                                   // bilinen kadarı; kalanı sayfada sorulur. Hiç verilmeyebilir.
+    RequiresShipping = true,                               // ödeyen adresini ve gönderim yöntemini sayfada seçer
     CancelUrl = "https://magazam.com/sepet",
 });
 
 return Results.Redirect(created.Order.CheckoutUrl!);       // müşteriyi buraya gönderin
 ```
 
-Siparişte müşterinin her parçası isteğe bağlıdır: `Reference`, `BillingAddress`, `ShippingAddress` ya da hiçbiri. Verilenler ödeme sayfasında dolu gelir, kalanı ödeyene sorulur. Referans verilmeyen siparişe geçit ödeme anında `guest-…` referansı yazar (`Customer.IsGuest`).
+Siparişte müşterinin her parçası isteğe bağlıdır: `Reference`, `BillingAddress`, `ShippingAddress` ya da hiçbiri. Verilenler ödeme sayfasında dolu gelir, kalanı ödeyene sorulur. Referans verilmezse ödeyen müşteri listenize yazılmaz. `SaveAsProduct = true` olan kalem referansıyla ürün listenize yazılır (referans zorunlu); `TaxRate` verilmezse kalem vergisizdir. Gönderim yöntemleri istekte gönderilmez: panelinizdeki **Gönderim Yöntemleri** listesinden ödeyenin adresine uyanlar sunulur.
 
-Yanıttaki `Order` siparişi bütünüyle taşır: `Token`, `ChannelToken`, `ChannelReference`, `Description`, `PaymentProviderToken`, `Status` (`OrderStatus.Open` / `Paid`), `Items`, `ShippingMethods`, `ShippingMethod` (ödeyenin seçtiği), `Subtotal`, `ShippingAmount`, `TaxAmount`, `Amount`, `Currency`, `IsTest`, `CreatedAt`, `CheckoutUrl` (ödenince `null`), `Transaction` (ödeyen işlem; açıkken `null`) ve `Customer`. Müşteri yanıtın üst seviyesinde de durur: `created.Customer` ile `created.Order.Customer` aynıdır; listelerde her siparişin kendi `Customer`'ı vardır.
+Yanıttaki `Order` siparişi bütünüyle taşır: `Token`, `Reference`, `Description`, `PaymentProviderToken`, `Status` (`OrderStatus.Open` / `Paid`), `Items`, `ShippingMethod` (ödeyenin seçtiği), `Subtotal`, `ShippingAmount`, `TaxAmount`, `Amount`, `Currency`, `IsTest`, `CreatedAt`, `CheckoutUrl` (ödenince `null`), `Transaction` (ödeyen işlem; açıkken `null`) ve `Customer`. Müşteri yanıtın üst seviyesinde de durur: `created.Customer` ile `created.Order.Customer` aynıdır; listelerde her siparişin kendi `Customer`'ı vardır.
 
-Ödendiğinde müşteri `SuccessUrl` adresinize 3D dönüşüyle aynı alanlarla POST edilir; kesin sonucu `RetrieveOrderAsync()` verir; `order.paid` webhook'u geldiğinde de onu çağırın. `Order.Transaction.PaymentStatus` sonradan yapılan iadeyi gösterir.
+Ödendiğinde müşteri `SuccessUrl` adresinize 3D dönüşüyle aynı alanlarla POST edilir; kesin sonucu `RetrieveOrdersAsync()` verir; `order.paid` webhook'u geldiğinde de onu çağırın. `Order.Transaction.PaymentStatus` sonradan yapılan iadeyi gösterir.
 
 ```csharp
-var current = await client.RetrieveOrderAsync(new RetrieveOrder { Token = token });
+var current = (await client.RetrieveOrdersAsync(new RetrieveOrders { Token = token })).Orders[0];
 
-if (current.Order.IsPaid)
+if (current.IsPaid)
 {
-    // current.Order.Transaction?.Token ile iade / iptal / RetrievePaymentAsync yapılabilir
+    // current.Transaction?.Token ile iade / iptal / RetrievePaymentsAsync yapılabilir
 }
 
 // Açık siparişte yalnızca gönderilen alanlar değişir; kalemler gönderilirse tamamı yenilenir.
 await client.UpdateOrderAsync(new UpdateOrder { Token = token, Description = "Hediye paketi", Clear = ["cancel_url"] });
 ```
 
-`Clear`, bir alanı boşaltmak içindir (alanı göndermemek eskisini korur). `ShippingMethods = []` bütün gönderim yöntemlerini kaldırır.
+`Clear`, bir alanı boşaltmak içindir (alanı göndermemek eskisini korur). Gönderilen müşteri referansı eskisinin yerine geçer; ödenmiş siparişe hiçbir şey yazılmaz.
 
-`Create*` çağrıları aynı kanal ve referans için tekrarlanabilir: aynı referansla ikinci kez açılan sipariş, link ya da (henüz ödenmemiş) abonelik yeni gönderilenlerle güncellenir ve kendi token'ıyla döner. Ödenmiş sipariş değişmez. **Bekleyen ödeme varken güncellenemez:** ödeme sayfasında son 15 dakika içinde başlamış bir ödeme varsa `Create*` ve `Update*` çağrıları `channel_reference` / `token` alanında reddedilir.
+`Create*` çağrıları aynı referans için tekrarlanabilir: aynı referansla ikinci kez açılan sipariş, link ya da (henüz ödenmemiş) abonelik yeni gönderilenlerle güncellenir ve kendi token'ıyla döner. Ödenmiş sipariş değişmez. **Bekleyen ödeme varken güncellenemez:** ödeme sayfasında son 15 dakika içinde başlamış bir ödeme varsa `Create*` ve `Update*` çağrıları `reference` / `token` alanında reddedilir.
 
 ## Ödeme linki
 
@@ -208,7 +205,7 @@ var link = await client.CreatePaymentLinkAsync(new CreatePaymentLink
 {
     Items = [new Item { Name = "Bağış", UnitAmount = "100.00", Quantity = 1, TaxRate = "0" }],
     Currency = Currency.TRY,
-    ChannelReference = "LNK-1",          // boş bırakılırsa geçit LINK{n} üretir
+    Reference = "LNK-1",                 // boş bırakılırsa geçit LINK{n} üretir
     ExpiresAt = "2026-12-31",            // çalışma alanının saat dilimine göre son gün
 });
 
@@ -217,7 +214,7 @@ link.PaymentLink.ExpiresAt;              // verilen günün sonu (çalışma ala
 link.PaymentLink.IsActive;               // açık ve süresi geçmemiş mi
 link.PaymentLink.IsTest;                 // ödemeleri şu an test ortamında mı alınıyor
 
-var detail = await client.RetrievePaymentLinkAsync(new RetrievePaymentLink { Token = link.PaymentLink.Token });
+var detail = (await client.RetrievePaymentLinksAsync(new RetrievePaymentLinks { Token = link.PaymentLink.Token })).PaymentLinks[0];
 detail.Transactions;                     // son 50 deneme, yeniden eskiye
 detail.TransactionsCount;                // linkteki denemelerin tamamının sayısı
 detail.Successful;                       // listelenenlerden başarılı olanlar
@@ -225,16 +222,16 @@ detail.Successful;                       // listelenenlerden başarılı olanlar
 await client.UpdatePaymentLinkAsync(new UpdatePaymentLink { Token = link.PaymentLink.Token, IsActive = false });
 ```
 
-Kanal verilmezse link istemcinin kanalına açılır. Panelin açtığı linklere ulaşmak (ya da linki oraya açmak) için kanal olarak `ChannelToken = ChannelMessage.OdemehubChannel` verin; yanıtta bu linklerin `ChannelToken`'ı `null`dır. Süresi geçmiş bir linki yeniden açmak için `IsActive = true` ile birlikte yeni bir `ExpiresAt` gönderin; son günü kaldırmak için `Clear = ["expires_at"]`.
+Panelden açtığınız linkler de aynı uçlarla bulunur. Linkle ödeyen kişi müşteri listenize yazılmaz ve kartı saklanmaz. Süresi geçmiş bir linki yeniden açmak için `IsActive = true` ile birlikte yeni bir `ExpiresAt` gönderin; son günü kaldırmak için `Clear = ["expires_at"]`.
 
 ## Abonelik
 
-İlk yenileme ödeme sayfasında ödenir ve kart orada saklanır; sonrakiler o karttan çekilir. Müşteri referansı zorunludur, çünkü kart onun altında saklanır. Ödeme hesabı (verilen ya da varsayılan) kart saklamalı ve 3D ödeme almalı, planınız kayıtlı kartları kapsamalıdır.
+İlk yenileme ödeme sayfasında ödenir ve kart orada müşteriye saklanır; sonrakiler müşterinin varsayılan kartından (son ödeme yaptığı kart) çekilir. Müşteri referansı zorunludur, çünkü kart o müşteriye bağlanır. Ödeme hesabı (verilen ya da varsayılan) kart saklamalı ve 3D ödeme almalı, planınız kayıtlı kartları kapsamalıdır.
 
 ```csharp
 var opened = await client.CreateSubscriptionAsync(new CreateSubscription
 {
-    ChannelReference = "ABO-1",
+    Reference = "ABO-1",
     Period = Period.Monthly,             // Daily | Weekly | Monthly | Annually
     SuccessUrl = "https://magazam.com/abonelik/donus",
     Items = [new Item { Name = "Premium", UnitAmount = "99.90", Quantity = 1, TaxRate = "20" }],
@@ -246,8 +243,7 @@ return Results.Redirect(opened.Subscription.CheckoutUrl!);
 ```
 
 ```csharp
-var current = await client.RetrieveSubscriptionAsync(new RetrieveSubscription { Token = token });
-var subscription = current.Subscription;
+var subscription = (await client.RetrieveSubscriptionsAsync(new RetrieveSubscriptions { Token = token })).Subscriptions[0];
 
 subscription.Status;            // SubscriptionStatus.Pending | Active | PastDue | Cancelled | Completed
 subscription.Renewal.Amount;    // içinde bulunulan yenilemenin tutarı
@@ -256,7 +252,7 @@ subscription.Renewal.EndsAt;    // ödenen dönemin sonu
 subscription.NextPaymentAt;     // sonraki tahsilat zamanı
 subscription.RenewalsPaid;      // şimdiye kadar ödenen yenileme sayısı
 subscription.CheckoutUrl;       // ödenmemiş yenileme varsa müşteriye verilecek adres
-subscription.Customer?.Reference;   // current.Customer ile aynı
+subscription.Customer?.Reference;
 
 // Dönem, kalemler, ödeme sayısı değişir; iptal de buradan:
 await client.UpdateSubscriptionAsync(new UpdateSubscription { Token = token, Status = SubscriptionStatus.Cancelled });
@@ -264,13 +260,13 @@ await client.UpdateSubscriptionAsync(new UpdateSubscription { Token = token, Sta
 
 Kalemler gönderilirse ödenmemiş yenilemeye ve sonrakilere yansır. İptalde para iade edilmez; ödenmiş dönem sonuna kadar sürer, sonra abonelik biter. Ödenmiş dönem yoksa iptal hemen geçerlidir. `RenewalLimit` şimdiye kadar ödenen yenilemelerin altına inemez; sınırı kaldırmak için `Clear = ["renewal_limit"]`.
 
-İlk ödemeden sonra kanal, ödeme hesabı, para birimi, dönem ve müşteri referansı değiştirilemez; geçit bunları 422 ile reddeder (aynı değeri yeniden göndermek değişiklik sayılmaz).
+İlk ödemeden sonra yalnızca iptal (`Status`), ödeme sayısı (`RenewalLimit`), dönem (`Period`) ve aynı kalemlerin birim fiyatı değişebilir; müşteri dahil başka bir alan gönderilirse geçit 422 ile reddeder.
 
 Dönem bitince yeni yenileme açılır ve müşterinin varsayılan kartından çekilir. Banka kabul etmezse çekim birkaç kez yeniden denenir; hiçbiri olmazsa abonelik `past_due` olur ve `CheckoutUrl` müşterinin kendisinin ödeyeceği adresi taşır.
 
 ## Webhook
 
-Sipariş ödendiğinde, link ödemesi alındığında, abonelik durum değiştirdiğinde, API ödemesi bittiğinde ve bir ödeme iade ya da iptal edildiğinde geçidin **kendi sunucusu** imzalı bir JSON POST gönderir. Müşteri sekmeyi kapatıp `CallbackUrl` / `SuccessUrl` adresinize hiç dönmese de bu bildirim gelir. Adresler kodda verilmez; panelde **Ayarlar → Webhook** sayfasında kanal, olay ve adres seçilerek tanımlanır.
+Sipariş ödendiğinde, link ödemesi alındığında, abonelik durum değiştirdiğinde, API ödemesi bittiğinde ve bir ödeme iade ya da iptal edildiğinde geçidin **kendi sunucusu** imzalı bir JSON POST gönderir. Müşteri sekmeyi kapatıp `CallbackUrl` / `SuccessUrl` adresinize hiç dönmese de bu bildirim gelir. Adresler kodda verilmez; panelde **Ayarlar → Webhook** sayfasında olay ve adres seçilerek tanımlanır.
 
 | Kaynak | Olaylar |
 | --- | --- |
@@ -309,16 +305,16 @@ app.MapPost("/odemehub/webhook", async (HttpRequest request, Client client) =>
 
     if (webhook.OrderToken is not null)
     {
-        var order = (await client.RetrieveOrderAsync(new RetrieveOrder { Token = webhook.OrderToken })).Order;
+        var order = (await client.RetrieveOrdersAsync(new RetrieveOrders { Token = webhook.OrderToken })).Orders[0];
         // order.Status == OrderStatus.Paid, order.Transaction?.PaymentStatus == PaymentStatus.Refunded ...
     }
     else if (webhook.SubscriptionToken is not null)
     {
-        var subscription = (await client.RetrieveSubscriptionAsync(new RetrieveSubscription { Token = webhook.SubscriptionToken })).Subscription;
+        var subscription = (await client.RetrieveSubscriptionsAsync(new RetrieveSubscriptions { Token = webhook.SubscriptionToken })).Subscriptions[0];
     }
     else if (webhook.TransactionToken is not null)   // transaction.* ve payment_link.*
     {
-        var transaction = (await client.RetrievePaymentAsync(new RetrievePayment { Token = webhook.TransactionToken })).Transaction;
+        var transaction = (await client.RetrievePaymentsAsync(new RetrievePayments { Token = webhook.TransactionToken })).Payments[0];
         // transaction.PaymentLinkToken: linkte alınan ödemede linkin token'ı
     }
 
@@ -326,23 +322,20 @@ app.MapPost("/odemehub/webhook", async (HttpRequest request, Client client) =>
 });
 ```
 
-Abonelik ve link ödemelerinin iade/iptal olaylarında `TransactionToken` da gelir; `RetrievePaymentAsync()` yanıtındaki `OrderToken` / `PaymentLinkToken` / `SubscriptionToken` ödemenin gerçekten o kaynağa ait olduğunu gösterir. Yalnızca doğrulamak için `client.VerifyWebhook(...)` `bool` döner. 2xx dışında bir yanıt (ya da yanıtsızlık) başarısız sayılır; geçit 60 sn, 5 dk, 15 dk ve 30 dk arayla toplam 5 kez dener ve yönlendirmeleri izlemez.
+Abonelik ve link ödemelerinin iade/iptal olaylarında `TransactionToken` da gelir; `RetrievePaymentsAsync()` yanıtındaki `OrderToken` / `PaymentLinkToken` / `SubscriptionToken` ödemenin gerçekten o kaynağa ait olduğunu gösterir. Yalnızca doğrulamak için `client.VerifyWebhook(...)` `bool` döner. 2xx dışında bir yanıt (ya da yanıtsızlık) başarısız sayılır; geçit 60 sn, 5 dk, 15 dk ve 30 dk arayla toplam 5 kez dener ve yönlendirmeleri izlemez.
 
 ## Kayıtlı kartlar
 
-Kart ödeme sırasında (`ShouldSave = true`) ya da ödemesiz saklanır. Kanal ve müşteri referansı ikilisinin altında durur; kart yanıtlarındaki `Customer` yalnızca `Reference` taşır.
+Kart ödeme sırasında (`ShouldSave = true`) ya da ödemesiz saklanır; ikisinde de `Customer.Reference` zorunludur. Kart o müşteriye bağlanır ve müşteri referansıyla bulunur; kart yanıtlarındaki `Customer` yalnızca `Reference` taşır. Ödemesiz saklamada müşteri, sağlayıcı kartı kabul edince gönderdiğiniz bilgilerle listenize yazılır.
 
 ```csharp
 var saved = await client.CreateSavedCardAsync(new CreateSavedCard { Customer = customer, Card = card });
 saved.SavedCard?.Token;                  // sağlayıcı saklamadıysa null, nedeni Result.Message
 
-var cards = await client.RetrieveSavedCardsByReferenceAsync(new RetrieveSavedCardsByReference
-{
-    CustomerReference = "musteri-88",
-});
+var cards = await client.RetrieveSavedCardsAsync(new RetrieveSavedCards { Reference = "musteri-88" });   // müşterinin referansı
 cards.Default;                           // varsayılan kart, varsa
 
-await client.RetrieveSavedCardAsync(new RetrieveSavedCard { Token = cardToken });
+await client.RetrieveSavedCardsAsync(new RetrieveSavedCards { Token = cardToken });
 await client.UpdateSavedCardAsync(new UpdateSavedCard { Token = cardToken });   // varsayılan yap
 await client.DeleteSavedCardAsync(new DeleteSavedCard { Token = cardToken });   // delete-saved-card/{token}
 ```
@@ -407,7 +400,7 @@ Taksitli satışta `RetrieveBinAsync` size o taksidin toplamını verir; onu `Am
 ```csharp
 var payment = await client.RegularPaymentAsync(new RegularPayment
 {
-    ChannelReference = "SIP-10234",
+    Reference = "SIP-10234",
     Amount = "473.60",        // 3 taksitin toplamı
     BaseAmount = "450.00",    // satılan tutar
     InstallmentNumber = 3,
@@ -438,16 +431,16 @@ if (payment.Conversion is not null)
 
 Çevrilmeyen ödemede `Conversion` `null` gelir. Güncel kur alınamıyorsa ödeme alınmaz; `422` ile `transaction.currency` alanında hata döner.
 
-## Referansla ve tarihle listeleme
+## Sorgulama
 
-Her kaynak kendi referansıyla ya da bir tarih aralığıyla bulunur. Referansla sorguda aynı referansı taşıyanlardan en son açılanı döner. Aralık en çok 7 gündür, `YYYY-MM-DD` biçimindedir ve çalışma alanının saat dilimindedir; boş bırakılırsa son 7 gün.
+Her kaynak tek bir `Retrieve*Async` metoduyla sorulur ve yanıt her zaman bir listedir (eskiden yeniye); eşleşen yoksa boş liste döner. Kayıt üç yoldan biriyle adlandırılır: `Token`, sizdeki `Reference` ya da açıldığı günler (`CreatedFrom` / `CreatedTo`). Aralık en çok 7 gündür, `YYYY-MM-DD` biçimindedir ve çalışma alanının saat dilimindedir; hiçbiri verilmezse son 7 gün.
 
 ```csharp
-// Yanıtı alınamayan bir ödemenin akıbeti: referanstaki son ödeme
-await client.RetrievePaymentByReferenceAsync(new RetrievePaymentByReference { ChannelReference = "SIP-10231" });
+// Yanıtı alınamayan bir ödemenin akıbeti: referanstaki bütün denemeler
+await client.RetrievePaymentsAsync(new RetrievePayments { Reference = "SIP-10231" });
 
-// Kanaldaki bütün denemeler, reddedilenler dahil, durumu ve tutarıyla
-var list = await client.RetrievePaymentsByChannelReferenceAsync(new RetrievePaymentsByChannelReference
+// Belli günlerdeki bütün denemeler, reddedilenler dahil, durumu ve tutarıyla
+var list = await client.RetrievePaymentsAsync(new RetrievePayments
 {
     CreatedFrom = "2026-09-26",
     CreatedTo = "2026-10-02",
@@ -455,13 +448,15 @@ var list = await client.RetrievePaymentsByChannelReferenceAsync(new RetrievePaym
 
 foreach (var transaction in list.Payments)
 {
-    transaction.Status;          // TransactionStatus; Timeout: sağlayıcı yanıt vermedi
-    transaction.PaymentStatus;   // PaymentStatus.Paid, Refunded, PartiallyRefunded ...
-    transaction.OrderToken;      // bağlı olduğu sipariş / link / abonelik, varsa
+    // transaction.Status: TransactionStatus; Timeout: sağlayıcı yanıt vermedi
+    // transaction.PaymentStatus: PaymentStatus.Paid, Refunded, PartiallyRefunded ...
+    // transaction.OrderToken: bağlı olduğu sipariş / link / abonelik, varsa
 }
+
+await client.RetrievePaymentsAsync(new RetrievePayments());   // son 7 gün
 ```
 
-Aynısı `RetrieveOrderByReferenceAsync` / `RetrieveOrdersByChannelReferenceAsync`, `RetrieveSubscriptionByReferenceAsync` / `RetrieveSubscriptionsByChannelReferenceAsync`, `RetrievePaymentLinkByReferenceAsync` / `RetrievePaymentLinksByChannelReferenceAsync` için de geçerlidir. Sipariş ve abonelik listelerinde her kaydın `Customer`'ı da gelir.
+Aynısı `RetrieveOrdersAsync` (`RetrieveOrders`), `RetrieveSubscriptionsAsync` (`RetrieveSubscriptions`), `RetrievePaymentLinksAsync` (`RetrievePaymentLinks`) ve `RetrieveSavedCardsAsync` (`RetrieveSavedCards`; `Reference` müşterinin referansıdır) için de geçerlidir. Sipariş ve abonelik listelerinde her kaydın `Customer`'ı da gelir.
 
 ## Hatalar
 
@@ -471,11 +466,11 @@ Bütün hatalar `OdemehubException`'dan türer; tek bir `catch` hepsini yakalar.
 | --- | --- | --- |
 | `AuthenticationException` | 401 | API anahtarı yanlış, imza tutmuyor ya da zaman damgası aralık dışında |
 | `ForbiddenException` | 403 | Çalışma alanı işlem yapamıyor (ödenmemiş bakiye, plan) ya da plan bu özelliği kapsamıyor |
-| `NotFoundException` | 404 | Token ya da kanal + referansla istenen kayıt (ödeme, sipariş, link, abonelik, kayıtlı kart) yok |
+| `NotFoundException` | 404 | Güncellenmek, silinmek, iade ya da iptal edilmek istenen kayıt yok (sorgularda boş liste döner) |
 | `ValidationException` | 422 | Alan hataları; `Errors` noktalı alan adıyla (`transaction.amount`, `order.items.0.name`) |
 | `RateLimitException` | 429 | İstek sınırı; `RetryAfter` saniye |
 | `SignatureException` | — | Yanıtın ya da bildirimin imzası doğrulanamadı; içeriğe güvenmeyin |
-| `TransportException` | — | Geçide ulaşılamadı ya da yanıt süresinde gelmedi; ödemenin akıbetini `RetrievePaymentByReferenceAsync` ile sorun |
+| `TransportException` | — | Geçide ulaşılamadı ya da yanıt süresinde gelmedi; ödemenin akıbetini `RetrievePaymentsAsync` ile referansla sorun |
 | `UnexpectedResponseException` | 500, diğer | Geçitte beklenmeyen hata ya da okunamayan yanıt; `Status` HTTP kodunu verir |
 
 ```csharp
@@ -506,21 +501,28 @@ Sınırlar çalışma alanı başına ve dakikalıktır:
 
 Aşıldığında `RateLimitException` döner; `RetryAfter` kadar bekleyip aynı isteği yeniden gönderin.
 
-## 2.0.0'daki kırıcı değişiklikler
+## 1.0.1'deki kırıcı değişiklikler
 
-2.0.0, geçidin bugünkü API'sine geçiştir; 1.x koduyla uyumlu değildir.
+1.0.1, SDK'yı geçidin bugünkü API'sine taşır ve 1.0.0 koduyla uyumlu değildir. 1.0.0'dan geçerken dikkat edilecekler:
 
 - **İmza:** `X-Timestamp` başlığı geldi; imza artık zaman damgası, metot, yol ve gövde üzerinden alınır (yukarıda).
-- **Uçlar:** `OrderPaymentAsync`, `SubscriptionPaymentAsync`, `SaveProductAsync`, `CancelSubscriptionAsync`, `RetrieveTransactionsAsync`, `SaveCardAsync`, `SavedCardsAsync`, `DefaultSavedCardAsync` kalktı. Yerlerine `Create*` / `Retrieve*` / `Retrieve*ByReference` / `Retrieve*sByChannelReference` / `Update*` ailesi geldi (sipariş, ödeme linki, abonelik, kayıtlı kart). Abonelik iptali `UpdateSubscriptionAsync` ile `Status = SubscriptionStatus.Cancelled`'dır. Token'la sorgular GET'tir.
+- **Uçlar:** `OrderPaymentAsync`, `SubscriptionPaymentAsync`, `SaveProductAsync`, `CancelSubscriptionAsync`, `RetrieveTransactionsAsync`, `SaveCardAsync`, `SavedCardsAsync`, `DefaultSavedCardAsync` kalktı. Yerlerine `Create*` / `Retrieve*` / `Update*` ailesi geldi (sipariş, ödeme linki, abonelik, kayıtlı kart). Abonelik iptali `UpdateSubscriptionAsync` ile `Status = SubscriptionStatus.Cancelled`'dır.
 - **Token parametresi:** tekil kaydı adlandıran istek alanı her yerde `Token`'dır (`RefundPayment`, `CancelPayment`, `RetrievePayment`, `RetrieveOrder`, `UpdateOrder` …); `TransactionToken`, `OrderToken`, `SubscriptionToken`, `SavedCardToken` istek adları kalktı (ödemedeki `SavedCardToken` alanı yerinde).
 - **Ödeme yanıtı iç içe:** `payment.TransactionToken` → `payment.Transaction.Token`, `payment.Status` → `payment.Transaction.Status`; iade ve iptalde `GiveBack.Type` / `Amount` → `GiveBack.Refund.Type` / `Amount`.
 - **Enum'lar:** para birimi, dönem, durumlar, kart şeması ve tipi `string` değil `Odemehub.Enums` enum'larıdır; bilinmeyen değer `Unknown` okunur.
 - **Müşteri:** `Customer { Reference, BillingAddress, ShippingAddress }` ve `Address`; eski düz müşteri alanları, `TaxDetails` ve istek tarafındaki `NamedCustomer` kalktı. Sipariş ve abonelik yanıtlarında müşteri hem üst seviyede hem kaydın üzerinde durur.
 - **Kalemler:** katalog yok; `Item` adı, fiyatı, adedi ve KDV oranını kendisi taşır. `OrderItem` / `SubscriptionItem` yerine `Item`, gönderim için `ShippingMethod`.
 - **Yanıt sınıfları:** `OrderDetails`, `OrderList`, `SubscriptionDetails`, `SubscriptionList`, `PaymentLinkDetails`, `PaymentLinkList`, `PaymentList`, `SavedCardDetails`, `SavedCardList`, `DeletedSavedCard`.
-- **Hatalar:** bulunamayan kayıt artık `NotFoundException` (404; eskiden 422 `ValidationException`). `ForbiddenException` (403) ve `RateLimitException` (429) eklendi.
+- **Hatalar:** güncellenen, silinen, iade ya da iptal edilen kaydın token'ı bulunamazsa `NotFoundException` (404) atılır; eskiden bu durum 422 dönüyordu. Sorgular bulunamayan kayıtta boş liste döner. Yeni istisnalar: `ForbiddenException` (403), `NotFoundException` (404), `RateLimitException` (429).
 - **İstemci tarafı denetim yok:** kartla kayıtlı kartın birlikte verilmesi artık `ArgumentException` değil, geçitten 422'dir.
 - **Webhook:** `OrderWebhook()`, `SubscriptionWebhook()`, `TransactionWebhook()` yerine tek `Webhook(method, path, body, timestamp, signature)` (ve `VerifyWebhook()`); imza istek ve yanıtlarla aynı şemadadır. Gövde yalnızca token taşır (`OrderToken`, `PaymentLinkToken`, `SubscriptionToken`, `TransactionToken`); durum `Retrieve*Async()` ile sorulur. Adresler panelde tanımlandığı için `SecurePayment`, `CreateOrder`, `UpdateOrder`, `CreateSubscription`, `UpdateSubscription` artık `WebhookUrl` almaz. `Signature`'ın yalnız gövdeyi imzalayan `Sign(body)` / `Verify(body, signature)` metotları kalktı.
+- **Kanal kalktı.** `Options.ChannelToken`, isteklerdeki `ChannelToken` ve `ChannelMessage` yoktur. Referans alanları `ChannelReference` yerine `Reference` adını taşır (ödeme, sipariş, abonelik, link, kalem); yanıtlarda `ChannelToken` yoktur. Geri dönüşte tarayıcı `channel_reference` değil `reference` POST eder.
+- **Sorgular tek uçta.** Her kaynakta tek sorgu metodu vardır: `RetrievePaymentsAsync`, `RetrieveOrdersAsync`, `RetrieveSubscriptionsAsync`, `RetrievePaymentLinksAsync`, `RetrieveSavedCardsAsync`. İstek `Token`, `Reference`, `CreatedFrom`/`CreatedTo` alır ya da boş verilir; yanıt her zaman listedir, bulunamayan kayıt `NotFoundException` değil boş listedir. GET isteği kalmadı.
+- **Gönderim:** sipariş ve abonelik `requiresShipping` ile ödeme sayfasında gönderim adresi ister; gönderim yöntemleri panelde tanımlanır, istekte gönderilmez. Yanıtta yalnızca ödeyenin seçtiği yöntem (`shippingMethod`: `reference`, `title`, `amount`, `taxRate`) gelir.
+- **Kalemler:** `TaxRate` isteğe bağlı; yeni `SaveAsProduct`.
+- **Müşteri:** referans gönderilmeyebilir; o zaman müşteri kaydedilmez ve kart saklanamaz. Abonelikte ve kart saklamada zorunludur. `NamedCustomer.IsGuest` kalktı; `Reference` ve `BillingAddress` `null` olabilir.
+- **Ödeme linki:** son 50 deneme ve `TransactionsCount` `RetrievePaymentLinksAsync` yanıtında her `PaymentLink` üzerindedir; `PaymentLinkDetails` yalnızca linki taşır.
+- **Kayıtlı kart:** listede her kart kendi `Customer`'ını taşır; `SavedCardList.Customer` kalktı. Listelenen ödemede `SavedCard`, kartın saklanması istendiyse saklanan kartı verir.
 
 ## İmzayı elle doğrulamak
 

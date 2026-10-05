@@ -6,14 +6,16 @@ namespace Odemehub.Requests;
 /// <summary>
 /// An order opened to be paid once on the gateway's own checkout page. The
 /// answer carries the checkout address; the customer is sent there, pays, and
-/// is posted back to <see cref="SuccessUrl"/>. The addresses set for the
-/// order's channel under Webhook in the panel hear that it was paid whether or
-/// not the customer comes back.
+/// is posted back to <see cref="SuccessUrl"/>. The addresses the team set
+/// under Webhook in the panel hear that it was paid whether or not the
+/// customer comes back. The customer may be left out, or sent without a
+/// reference: the payer then says who they are on the checkout, and is not
+/// kept as one of the team's customers.
 /// </summary>
 public sealed class CreateOrder : CheckoutMessage
 {
     /// <summary>The number the order is known by in the calling system. Has to carry at least one digit.</summary>
-    public required string ChannelReference { get; init; }
+    public required string Reference { get; init; }
 
     /// <summary>
     /// Where the customer's browser is posted back to once it is paid, with
@@ -29,58 +31,29 @@ public sealed class CreateOrder : CheckoutMessage
 
     internal override string Path => "create-order";
 
-    internal override JsonObject ToBody(string channelToken)
+    internal override JsonObject ToBody()
     {
-        return Body("order", Details(Channel(channelToken), ChannelReference, SuccessUrl, Items), Customer);
+        return Body("order", Details(Reference, SuccessUrl, Items), Customer);
     }
 }
 
-/// <summary>
-/// Where an order stands, by the token the gateway gave it when it was
-/// opened: what it is for, whether it has been paid and, if so, by which
-/// payment. This is how a merchant learns what became of an order whose
-/// customer never came back from the checkout.
-/// </summary>
-public sealed class RetrieveOrder : RetrieveByToken
-{
-    internal override string Endpoint => "retrieve-order";
-}
 
-/// <summary>
-/// Where the latest order under one of the merchant's own numbers on a
-/// channel stands.
-/// </summary>
-public sealed class RetrieveOrderByReference : RetrieveByReference
-{
-    internal override string Path => "retrieve-order-by-reference";
-}
 
-/// <summary>
-/// Every order opened on a channel within a span of days, oldest first, each
-/// with whose it is.
-/// </summary>
-public sealed class RetrieveOrdersByChannelReference : RetrieveByChannelReference
-{
-    internal override string Path => "retrieve-orders-by-channel-reference";
-}
 
 /// <summary>
 /// A change to an open order, named by its token in the address and again in
 /// the body. Only what is sent is written: a field left out keeps what there
 /// was, lines sent replace every line there was, and the customer sent is
-/// written over the one the order had. A paid order, or one with a payment
-/// under way, cannot be changed; the gateway says so on <c>token</c>.
+/// written over the one the order had; a reference sent takes the place of the
+/// one there was. A paid order, or one with a payment under way, cannot be
+/// changed; the gateway says so on <c>token</c>.
 /// </summary>
-/// <remarks>
-/// The channel is written only when this message names one; the client's own
-/// is not sent, so a change never moves an order between channels by accident.
-/// </remarks>
 public sealed class UpdateOrder : CheckoutMessage
 {
     /// <summary>The order's token in the gateway.</summary>
     public required string Token { get; init; }
 
-    public string? ChannelReference { get; init; }
+    public string? Reference { get; init; }
 
     public string? SuccessUrl { get; init; }
 
@@ -97,8 +70,14 @@ public sealed class UpdateOrder : CheckoutMessage
 
     internal override string Path => $"update-order/{Token}";
 
-    internal override JsonObject ToBody(string channelToken)
+    internal override JsonObject ToBody()
     {
-        return Body("order", Cleared(Details(ChannelToken, ChannelReference, SuccessUrl, Items), Clear), Customer, Token);
+        return Body("order", Cleared(Details(Reference, SuccessUrl, Items), Clear), Customer, Token);
     }
+}
+
+/// <summary>Orders asked after, each with its customer.</summary>
+public sealed class RetrieveOrders : Retrieve
+{
+    internal override string Path => "retrieve-orders";
 }

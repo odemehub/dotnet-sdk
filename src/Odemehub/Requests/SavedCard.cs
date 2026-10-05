@@ -5,16 +5,17 @@ namespace Odemehub.Requests;
 /// <summary>
 /// A card kept for a customer without a payment being made on it. The
 /// provider is told who the card belongs to, so the token it hands back is
-/// held under that customer and the card can be charged again later. It is
-/// kept under the channel and the customer's reference together; a payment
-/// with the card has to name the same two.
+/// held under that customer and the card can be charged again later. Once the
+/// provider takes it, the team's customer under the reference is written from
+/// what was sent and the card is kept for them; a payment with the card has to
+/// name the same reference.
 /// </summary>
 /// <remarks>
 /// Providers without a card store of their own keep a card by charging a small
 /// amount and giving it straight back; those need the security code, and the
 /// ones with a real card store do not. It is never stored.
 /// </remarks>
-public sealed class CreateSavedCard : ChannelMessage
+public sealed class CreateSavedCard : Message
 {
     /// <summary>Who the card belongs to: the reference and the whole billing address, both required.</summary>
     public required Customer Customer { get; init; }
@@ -26,47 +27,19 @@ public sealed class CreateSavedCard : ChannelMessage
 
     internal override string Path => "create-saved-card";
 
-    internal override JsonObject ToBody(string channelToken)
+    internal override JsonObject ToBody()
     {
         var card = Card.ToBody();
         card.Remove("should_save");
 
-        return Fields.Of(
-            ("saved_card", Fields.Said(
-                ("channel_token", Channel(channelToken)),
-                ("payment_provider_token", PaymentProviderToken))),
+        return Fields.Said(
+            ("saved_card", PaymentProviderToken is null ? null : Fields.Of(("payment_provider_token", PaymentProviderToken))),
             ("customer", Customer.ToBody()),
             ("card", card));
     }
 }
 
-/// <summary>
-/// One kept card, by its token.
-/// </summary>
-public sealed class RetrieveSavedCard : RetrieveByToken
-{
-    internal override string Endpoint => "retrieve-saved-card";
-}
 
-/// <summary>
-/// The cards kept for a customer, named by the two things a card is kept
-/// under: the channel and the merchant's reference for them. A customer with
-/// none answers an empty list.
-/// </summary>
-public sealed class RetrieveSavedCardsByReference : ChannelMessage
-{
-    /// <summary>The key the merchant keeps the customer under.</summary>
-    public required string CustomerReference { get; init; }
-
-    internal override string Path => "retrieve-saved-cards-by-reference";
-
-    internal override JsonObject ToBody(string channelToken)
-    {
-        return Fields.Of(
-            ("channel_token", Channel(channelToken)),
-            ("customer_reference", CustomerReference));
-    }
-}
 
 /// <summary>
 /// A change to a kept card, named by its token in the address and again in
@@ -84,7 +57,7 @@ public sealed class UpdateSavedCard : Message
 
     internal override string Path => $"update-saved-card/{Token}";
 
-    internal override JsonObject ToBody(string channelToken)
+    internal override JsonObject ToBody()
     {
         return Fields.Of(
             ("token", Token),
@@ -105,8 +78,21 @@ public sealed class DeleteSavedCard : Message
 
     internal override string Path => $"delete-saved-card/{Token}";
 
-    internal override JsonObject ToBody(string channelToken)
+    internal override JsonObject ToBody()
     {
         return Fields.Of(("token", Token));
     }
+}
+
+/// <summary>
+/// Kept cards asked after: one by its token, every card of a customer by the
+/// merchant's reference for them, or the ones kept between two days. A
+/// customer's cards come with the one they pay with by default first.
+/// </summary>
+public sealed class RetrieveSavedCards : Retrieve
+{
+    internal override string Path => "retrieve-saved-cards";
+
+    /// <summary>A card is named by the reference of the customer it is kept for.</summary>
+    internal override string ReferenceField => "customer_reference";
 }

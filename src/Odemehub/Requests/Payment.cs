@@ -13,14 +13,14 @@ namespace Odemehub.Requests;
 /// through the account the card is kept at, so no account is named either;
 /// the gateway turns down a payment that names both.
 /// </remarks>
-public abstract class Payment : ChannelMessage
+public abstract class Payment : Message
 {
     /// <summary>
     /// The reference the payment is known by in the calling system, such as
     /// SIP-10231. It has to carry at least one digit: its digits end the order
     /// number the bank is sent, so the payment can be found in the bank's panel.
     /// </summary>
-    public required string ChannelReference { get; init; }
+    public required string Reference { get; init; }
 
     /// <summary>
     /// The amount, as digits with the kurus behind a point: "100", "100.1" or
@@ -35,7 +35,11 @@ public abstract class Payment : ChannelMessage
     /// <summary>The address the customer is paying from, as the merchant sees it.</summary>
     public required string Ip { get; init; }
 
-    /// <summary>Who is paying: the reference, if any, and the whole billing address.</summary>
+    /// <summary>
+    /// Who is paying: the whole billing address and, when the merchant keeps
+    /// them, their reference. A payment that keeps its card, or is made with a
+    /// kept one, has to name the customer the card is theirs.
+    /// </summary>
     public required Customer Customer { get; init; }
 
     /// <summary>The card typed in. Left out only when a kept card is named instead.</summary>
@@ -66,12 +70,11 @@ public abstract class Payment : ChannelMessage
     /// The request body. The signature is not part of it; the client signs the
     /// body as a whole and sends the signature in a header of its own.
     /// </summary>
-    internal override JsonObject ToBody(string channelToken)
+    internal override JsonObject ToBody()
     {
         return Fields.Said(
             ("transaction", Fields.Said(
-                ("channel_token", Channel(channelToken)),
-                ("channel_reference", ChannelReference),
+                ("reference", Reference),
                 ("payment_provider_token", PaymentProviderToken),
                 ("amount", Amount),
                 ("base_amount", BaseAmount),
@@ -100,9 +103,9 @@ public sealed class SecurePayment : Payment
 
     internal override string Path => "secure-payment";
 
-    internal override JsonObject ToBody(string channelToken)
+    internal override JsonObject ToBody()
     {
-        var body = base.ToBody(channelToken);
+        var body = base.ToBody();
         body["transaction"]!["callback_url"] = CallbackUrl;
 
         return body;
@@ -135,9 +138,9 @@ public sealed class RefundPayment : PaymentMessage
 
     internal override string Path => "refund-payment";
 
-    internal override JsonObject ToBody(string channelToken)
+    internal override JsonObject ToBody()
     {
-        var body = base.ToBody(channelToken);
+        var body = base.ToBody();
 
         if (Amount is not null)
         {
@@ -159,37 +162,8 @@ public sealed class CancelPayment : PaymentMessage
     internal override string Path => "cancel-payment";
 }
 
-/// <summary>
-/// How a payment went, asked for after the fact by its token. A customer sent
-/// to their bank comes back carrying the payment's token and nothing more,
-/// because a browser cannot be given anything to sign with; this is the call
-/// that says what became of it.
-/// </summary>
-public sealed class RetrievePayment : RetrieveByToken
-{
-    internal override string Endpoint => "retrieve-payment";
-}
 
-/// <summary>
-/// How the latest payment under one of the merchant's own references went,
-/// for the merchant that started a payment and never heard back. A customer
-/// may have tried more than once under the same reference; the last attempt
-/// is the one answered, and <see cref="RetrievePaymentsByChannelReference"/>
-/// lists them all.
-/// </summary>
-public sealed class RetrievePaymentByReference : RetrieveByReference
-{
-    internal override string Path => "retrieve-payment-by-reference";
-}
 
-/// <summary>
-/// Every payment attempt made on a channel within a span of days, the ones
-/// the bank turned away included, oldest first.
-/// </summary>
-public sealed class RetrievePaymentsByChannelReference : RetrieveByChannelReference
-{
-    internal override string Path => "retrieve-payments-by-channel-reference";
-}
 
 /// <summary>
 /// A question about a card before anything is charged to it: who issued it,
@@ -220,7 +194,7 @@ public sealed class RetrieveBin : Message
 
     internal override string Path => "retrieve-bin";
 
-    internal override JsonObject ToBody(string channelToken)
+    internal override JsonObject ToBody()
     {
         return Fields.Of(
             ("transaction", Fields.Said(
@@ -229,4 +203,14 @@ public sealed class RetrieveBin : Message
                 ("currency", Wire.Of(Currency)))),
             ("card", Fields.Of(("bin", Bin))));
     }
+}
+
+/// <summary>
+/// Payments asked after: one by its token, every attempt made under the
+/// merchant's reference, or the ones made between two days — the ones the
+/// bank turned away included.
+/// </summary>
+public sealed class RetrievePayments : Retrieve
+{
+    internal override string Path => "retrieve-payments";
 }

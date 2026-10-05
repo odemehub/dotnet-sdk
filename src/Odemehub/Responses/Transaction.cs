@@ -21,8 +21,7 @@ public sealed record Transaction
         var installmentNumber = Read.Int(transaction.Field("installment_number"));
 
         Token = Read.String(transaction.Field("token"));
-        ChannelToken = Read.String(transaction.Field("channel_token"));
-        ChannelReference = Read.String(transaction.Field("channel_reference"));
+        Reference = Read.String(transaction.Field("reference"));
         Status = Read.Enum<TransactionStatus>(transaction.Field("status"));
         PaymentStatus = Read.Enum<PaymentStatus>(transaction.Field("payment_status"));
         SecurityType = Read.Enum<SecurityType>(transaction.Field("security_type"));
@@ -39,16 +38,15 @@ public sealed record Transaction
         OrderToken = Read.NonEmptyString(transaction.Field("order").Field("token"));
         PaymentLinkToken = Read.NonEmptyString(transaction.Field("payment_link").Field("token"));
         SubscriptionToken = Read.NonEmptyString(transaction.Field("subscription").Field("token"));
+        SavedCard = transaction.Field("saved_card").ValueKind == JsonValueKind.Object ? new SavedCard(transaction.Field("saved_card")) : null;
     }
 
     /// <summary>The payment's token in the gateway, which names it again to ask after or give back.</summary>
     public string Token { get; }
 
-    /// <summary>The channel the payment came in on.</summary>
-    public string ChannelToken { get; }
 
     /// <summary>The reference the payment was made under in the calling system.</summary>
-    public string ChannelReference { get; }
+    public string Reference { get; }
 
     /// <summary>The attempt's state.</summary>
     public TransactionStatus Status { get; }
@@ -97,34 +95,39 @@ public sealed record Transaction
     public string? SubscriptionToken { get; }
 
     /// <summary>Whether the attempt went through.</summary>
+    /// <summary>The card the payment kept, when it asked to keep one and went through; null otherwise.</summary>
+    public SavedCard? SavedCard { get; }
+
     public bool IsSuccessful => Status == TransactionStatus.Successful;
 }
 
 /// <summary>
-/// Every payment attempt made on a channel within a span of days, oldest
-/// first, so they read as the attempts were made.
+/// Payments asked after, each with its state, amount, customer and what became
+/// of its money, the ones the bank turned away included. The answer is always a list, oldest first, and an empty one when
+/// nothing matched. The days are the ones the gateway used, when the records
+/// were asked for by the days they were made on: the ones asked for, or the
+/// last seven when none were.
 /// </summary>
 public sealed record PaymentList
 {
     internal PaymentList(JsonElement body)
     {
         Result = new Result(body);
-        CreatedFrom = Read.String(body.Field("created_from"));
-        CreatedTo = Read.String(body.Field("created_to"));
-        Payments = Read.List(body.Field("payments"), transaction => new Transaction(transaction));
+        CreatedFrom = Read.NonEmptyString(body.Field("created_from"));
+        CreatedTo = Read.NonEmptyString(body.Field("created_to"));
+        Payments = Read.List(body.Field("payments"), entry => new Transaction(entry));
     }
 
     public Result Result { get; }
 
-    /// <summary>The first day looked at, as <c>YYYY-MM-DD</c> in the team's timezone.</summary>
-    public string CreatedFrom { get; }
+    /// <summary>The first day listed, as <c>YYYY-MM-DD</c> in the team's timezone; null when they were asked for by token or reference.</summary>
+    public string? CreatedFrom { get; }
 
-    /// <summary>The last day looked at, the same way.</summary>
-    public string CreatedTo { get; }
+    /// <summary>The last day listed, the same way.</summary>
+    public string? CreatedTo { get; }
 
-    /// <summary>The attempts, oldest first.</summary>
     public IReadOnlyList<Transaction> Payments { get; }
 
-    /// <summary>The attempts that went through.</summary>
+    /// <summary>The payments that went through.</summary>
     public IReadOnlyList<Transaction> Successful => Payments.Where(payment => payment.IsSuccessful).ToArray();
 }

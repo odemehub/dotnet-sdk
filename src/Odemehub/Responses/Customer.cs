@@ -68,28 +68,27 @@ public sealed record PaymentCustomer
 
 /// <summary>
 /// The customer of an order or a subscription, as they were written: the key
-/// the merchant keeps them under — or the one the gateway made up for a payer
-/// the merchant never named, <c>guest-…</c> — where the bill goes, and where
-/// the goods go when somebody said.
+/// the merchant keeps them under, where the bill goes, and where the goods go
+/// when somebody said.
 /// </summary>
 public sealed record NamedCustomer
 {
     internal NamedCustomer(JsonElement customer)
     {
+        var billing = customer.Field("billing_address");
         var shipping = customer.Field("shipping_address");
 
-        Reference = Read.String(customer.Field("reference"));
-        BillingAddress = new Address(customer.Field("billing_address"));
+        Reference = Read.NonEmptyString(customer.Field("reference"));
+        BillingAddress = billing.ValueKind == JsonValueKind.Object ? new Address(billing) : null;
         ShippingAddress = shipping.ValueKind == JsonValueKind.Object ? new Address(shipping) : null;
     }
 
-    public string Reference { get; }
+    /// <summary>The merchant's own key for the customer; null for somebody the team does not keep.</summary>
+    public string? Reference { get; }
 
-    public Address BillingAddress { get; }
+    /// <summary>Where the bill goes; null until somebody has said.</summary>
+    public Address? BillingAddress { get; }
 
     /// <summary>Where the goods go; null when nobody said.</summary>
     public Address? ShippingAddress { get; }
-
-    /// <summary>Whether the reference is one the gateway made up for a payer the merchant never named.</summary>
-    public bool IsGuest => Reference.StartsWith("guest-", System.StringComparison.Ordinal);
 }

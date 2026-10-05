@@ -21,8 +21,7 @@ public sealed record Subscription
         var shippingMethod = subscription.Field("shipping_method");
 
         Token = Read.String(subscription.Field("token"));
-        ChannelToken = Read.String(subscription.Field("channel_token"));
-        ChannelReference = Read.String(subscription.Field("channel_reference"));
+        Reference = Read.String(subscription.Field("reference"));
         Description = Read.NonEmptyString(subscription.Field("description"));
         PaymentProviderToken = Read.NonEmptyString(subscription.Field("payment_provider_token"));
         Status = Read.Enum<SubscriptionStatus>(subscription.Field("status"));
@@ -30,7 +29,6 @@ public sealed record Subscription
         RenewalLimit = Read.OptionalInt(subscription.Field("renewal_limit"));
         RenewalsPaid = Read.Int(subscription.Field("renewals_paid"));
         Items = Read.List(subscription.Field("items"), item => new Item(item));
-        ShippingMethods = Read.List(subscription.Field("shipping_methods"), method => new ShippingMethod(method));
         ShippingMethod = shippingMethod.ValueKind == JsonValueKind.Object ? new ShippingMethod(shippingMethod) : null;
         Subtotal = Read.String(subscription.Field("subtotal"));
         ShippingAmount = Read.String(subscription.Field("shipping_amount"));
@@ -49,11 +47,9 @@ public sealed record Subscription
     /// <summary>The subscription's token in the gateway; name it to ask after or change it later.</summary>
     public string Token { get; }
 
-    /// <summary>The channel the subscription was opened on.</summary>
-    public string ChannelToken { get; }
 
     /// <summary>The key the subscription is known by in the calling system.</summary>
-    public string ChannelReference { get; }
+    public string Reference { get; }
 
     public string? Description { get; }
 
@@ -75,8 +71,6 @@ public sealed record Subscription
     /// <summary>What is subscribed to.</summary>
     public IReadOnlyList<Item> Items { get; }
 
-    /// <summary>The ways the goods may be sent, as the merchant offered them.</summary>
-    public IReadOnlyList<ShippingMethod> ShippingMethods { get; }
 
     /// <summary>The way the payer picked; null until they have, or when none was offered.</summary>
     public ShippingMethod? ShippingMethod { get; }
@@ -181,7 +175,7 @@ public sealed record Renewal
 }
 
 /// <summary>
-/// A subscription opened, changed, called off or asked after. Whose it is is
+/// A subscription opened, changed or called off. Whose it is is
 /// said beside the subscription, as the answer says it, and on the
 /// subscription as well.
 /// </summary>
@@ -203,26 +197,29 @@ public sealed record SubscriptionDetails
 }
 
 /// <summary>
-/// Every subscription opened on a channel within a span of days, oldest first.
+/// Subscriptions asked after, each with its customer on
+/// <c>Subscription.Customer</c>. The answer is always a list, oldest first, and an empty one when
+/// nothing matched. The days are the ones the gateway used, when the records
+/// were asked for by the days they were made on: the ones asked for, or the
+/// last seven when none were.
 /// </summary>
 public sealed record SubscriptionList
 {
     internal SubscriptionList(JsonElement body)
     {
         Result = new Result(body);
-        CreatedFrom = Read.String(body.Field("created_from"));
-        CreatedTo = Read.String(body.Field("created_to"));
-        Subscriptions = Read.List(body.Field("subscriptions"), subscription => new Subscription(subscription, subscription.Field("customer")));
+        CreatedFrom = Read.NonEmptyString(body.Field("created_from"));
+        CreatedTo = Read.NonEmptyString(body.Field("created_to"));
+        Subscriptions = Read.List(body.Field("subscriptions"), entry => new Subscription(entry, entry.Field("customer")));
     }
 
     public Result Result { get; }
 
-    /// <summary>The first day looked at, as <c>YYYY-MM-DD</c> in the team's timezone.</summary>
-    public string CreatedFrom { get; }
+    /// <summary>The first day listed, as <c>YYYY-MM-DD</c> in the team's timezone; null when they were asked for by token or reference.</summary>
+    public string? CreatedFrom { get; }
 
-    /// <summary>The last day looked at, the same way.</summary>
-    public string CreatedTo { get; }
+    /// <summary>The last day listed, the same way.</summary>
+    public string? CreatedTo { get; }
 
-    /// <summary>The subscriptions, oldest first, each with whose it is.</summary>
     public IReadOnlyList<Subscription> Subscriptions { get; }
 }
