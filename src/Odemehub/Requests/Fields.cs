@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -51,5 +53,14 @@ internal static class Fields
         }
 
         return body;
+    }
+
+    /// <summary>
+    /// A list of plain values as the body carries it; null for a list nobody
+    /// gave, so it is left out like any other field not said.
+    /// </summary>
+    internal static JsonArray? List(IEnumerable<string?>? values)
+    {
+        return values is null ? null : new JsonArray(values.Select(value => (JsonNode?)value).ToArray());
     }
 }

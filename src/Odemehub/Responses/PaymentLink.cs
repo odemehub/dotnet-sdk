@@ -6,9 +6,10 @@ using Odemehub.Enums;
 namespace Odemehub.Responses;
 
 /// <summary>
-/// A payment link as it stands: what is sold, what it comes to now, whether
-/// it takes payments and until when, the environment its payments are taken
-/// in, and the address it is paid at while it can be paid.
+/// A payment link as it stands: what is sold — its lines and what they come to
+/// now, or what the payer may pick and the tax on it — in which money,
+/// whether it takes payments and until when, the environment its payments
+/// are taken in, and the address it is paid at while it can be paid.
 /// </summary>
 public sealed record PaymentLink
 {
@@ -18,11 +19,19 @@ public sealed record PaymentLink
         Reference = Read.String(link.Field("reference"));
         Description = Read.NonEmptyString(link.Field("description"));
         PaymentProviderToken = Read.NonEmptyString(link.Field("payment_provider_token"));
+        AmountType = Read.Enum<AmountType>(link.Field("amount_type"));
+        ItemName = Read.NonEmptyString(link.Field("item_name"));
+        PredefinedAmounts = Read.OptionalList(link.Field("predefined_amounts"), Read.String);
+        TaxRate = Read.OptionalString(link.Field("tax_rate"));
+        TaxMode = Read.Enum<TaxMode>(link.Field("tax_mode"));
         Items = Read.List(link.Field("items"), item => new Item(item));
-        Subtotal = Read.String(link.Field("subtotal"));
-        TaxAmount = Read.String(link.Field("tax_amount"));
-        Amount = Read.String(link.Field("amount"));
+        Subtotal = Read.OptionalString(link.Field("subtotal"));
+        TaxAmount = Read.OptionalString(link.Field("tax_amount"));
+        Amount = Read.OptionalString(link.Field("amount"));
         Currency = Read.Enum<Currency>(link.Field("currency"));
+        CurrencyType = Read.Enum<CurrencyType>(link.Field("currency_type"));
+        Currencies = Read.OptionalList(link.Field("currencies"), Read.Enum<Currency>);
+        EmailsPayer = Read.Bool(link.Field("emails_payer"));
         IsActive = Read.Bool(link.Field("is_active"));
         IsTest = Read.Bool(link.Field("is_test"));
         ExpiresAt = Read.NonEmptyString(link.Field("expires_at"));
@@ -44,19 +53,44 @@ public sealed record PaymentLink
     /// <summary>The account the link is paid through; null when the team's Gate rules and default account decide.</summary>
     public string? PaymentProviderToken { get; }
 
-    /// <summary>What the link is for.</summary>
+    /// <summary>What the payer pays: the lines, or an amount they pick.</summary>
+    public AmountType AmountType { get; }
+
+    /// <summary>The name of the one line an amount the payer picks is paid as; null for a link paid as its lines.</summary>
+    public string? ItemName { get; }
+
+    /// <summary>The amounts the payer picks from; null for a link that offers none.</summary>
+    public IReadOnlyList<string>? PredefinedAmounts { get; }
+
+    /// <summary>The tax on an amount the payer picks, as a percentage; null for a link paid as its lines, or one without tax.</summary>
+    public string? TaxRate { get; }
+
+    /// <summary>Whether <see cref="TaxRate"/> is inside the amount the payer picks or added on top of it.</summary>
+    public TaxMode TaxMode { get; }
+
+    /// <summary>What the link is for; empty when the payer picks the amount.</summary>
     public IReadOnlyList<Item> Items { get; }
 
-    /// <summary>What the lines come to before tax.</summary>
-    public string Subtotal { get; }
+    /// <summary>What the lines come to before tax; null when the payer picks the amount.</summary>
+    public string? Subtotal { get; }
 
-    /// <summary>The tax the lines carry.</summary>
-    public string TaxAmount { get; }
+    /// <summary>The tax the lines carry; null when the payer picks the amount.</summary>
+    public string? TaxAmount { get; }
 
-    /// <summary>What one payment on the link comes to, added up by the gateway.</summary>
-    public string Amount { get; }
+    /// <summary>What one payment on the link comes to, added up by the gateway; null when the payer picks the amount.</summary>
+    public string? Amount { get; }
 
+    /// <summary>The link's money; the one the payer starts with where they may pick.</summary>
     public Currency Currency { get; }
+
+    /// <summary>Whether the link is paid in its one money or the payer picks one.</summary>
+    public CurrencyType CurrencyType { get; }
+
+    /// <summary>The moneys the payer may pick, <see cref="Currency"/> among them; null for a link paid in its one money.</summary>
+    public IReadOnlyList<Currency>? Currencies { get; }
+
+    /// <summary>Whether the payer is sent an e-mail once their payment goes through.</summary>
+    public bool EmailsPayer { get; }
 
     /// <summary>Whether it takes payments now: switched on and its last day not gone by.</summary>
     public bool IsActive { get; }
@@ -85,8 +119,9 @@ public sealed record PaymentLink
 
 /// <summary>
 /// The answer to opening or changing a payment link: the link as it now
-/// stands. Its payments are on the link when it is asked after with
-/// <c>RetrievePaymentLinksAsync</c>.
+/// stands. Its latest payment attempts are on the link when it is asked after
+/// with <c>RetrievePaymentLinksAsync</c>, and the payments made at it, one
+/// per payer, with <c>RetrieveLinkPaymentsAsync</c>.
 /// </summary>
 public sealed record PaymentLinkDetails
 {

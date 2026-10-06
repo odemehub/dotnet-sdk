@@ -30,6 +30,7 @@ public sealed record Subscription
         RenewalsPaid = Read.Int(subscription.Field("renewals_paid"));
         Items = Read.List(subscription.Field("items"), item => new Item(item));
         ShippingMethod = shippingMethod.ValueKind == JsonValueKind.Object ? new ShippingMethod(shippingMethod) : null;
+        Discount = Discount.Of(subscription.Field("discount"));
         Subtotal = Read.String(subscription.Field("subtotal"));
         ShippingAmount = Read.String(subscription.Field("shipping_amount"));
         TaxAmount = Read.String(subscription.Field("tax_amount"));
@@ -74,6 +75,14 @@ public sealed record Subscription
 
     /// <summary>The way the payer picked; null until they have, or when none was offered.</summary>
     public ShippingMethod? ShippingMethod { get; }
+
+    /// <summary>
+    /// The coupon the payer put on the first payment at checkout, the only
+    /// one that takes a coupon; null when none was. The subscription's own
+    /// amounts stay as they are: what the first renewal was charged is on
+    /// <see cref="Renewal"/>.
+    /// </summary>
+    public Discount? Discount { get; }
 
     /// <summary>What the lines come to before tax.</summary>
     public string Subtotal { get; }

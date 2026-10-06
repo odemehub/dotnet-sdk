@@ -115,4 +115,13 @@ internal static class Read
             _ => Array.Empty<T>(),
         };
     }
+
+    /// <summary>
+    /// A list the answer may genuinely not carry: null when it was left out
+    /// or said as nothing, rather than an empty list.
+    /// </summary>
+    internal static IReadOnlyList<T>? OptionalList<T>(JsonElement value, Func<JsonElement, T> read)
+    {
+        return IsSaid(value) ? List(value, read) : null;
+    }
 }

@@ -105,8 +105,9 @@ public record Payment
 
 /// <summary>
 /// A payment as an outcome says it, in full. A payment made at an order, a
-/// payment link or a subscription names it, so a webhook about one of them can
-/// be checked against the payment it names.
+/// payment link or a subscription names it — one at a link names the payer's
+/// payment at it as well — so a webhook about one of them can be checked
+/// against the payment it names.
 /// </summary>
 public sealed record PaymentTransaction
 {
@@ -125,6 +126,7 @@ public sealed record PaymentTransaction
         CreatedAt = Read.NonEmptyString(transaction.Field("created_at"));
         OrderToken = Read.NonEmptyString(transaction.Field("order").Field("token"));
         PaymentLinkToken = Read.NonEmptyString(transaction.Field("payment_link").Field("token"));
+        LinkPaymentToken = Read.NonEmptyString(transaction.Field("link_payment").Field("token"));
         SubscriptionToken = Read.NonEmptyString(transaction.Field("subscription").Field("token"));
     }
 
@@ -165,6 +167,9 @@ public sealed record PaymentTransaction
 
     /// <summary>The payment link the payment was made on; null when it was made on none.</summary>
     public string? PaymentLinkToken { get; }
+
+    /// <summary>The payer's payment at the link the payment was made on, there whenever <see cref="PaymentLinkToken"/> is; null otherwise.</summary>
+    public string? LinkPaymentToken { get; }
 
     /// <summary>The subscription whose renewal the payment paid; null when it paid none.</summary>
     public string? SubscriptionToken { get; }

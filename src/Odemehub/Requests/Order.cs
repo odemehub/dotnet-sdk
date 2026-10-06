@@ -14,7 +14,7 @@ namespace Odemehub.Requests;
 /// </summary>
 public sealed class CreateOrder : CheckoutMessage
 {
-    /// <summary>The number the order is known by in the calling system. Has to carry at least one digit.</summary>
+    /// <summary>The number the order is known by in the calling system. Has to carry at least one digit; it need not be unique.</summary>
     public required string Reference { get; init; }
 
     /// <summary>

@@ -9,10 +9,11 @@ namespace Odemehub.Responses;
 /// Webhook in the panel, as plain JSON signed the way every answer is.
 /// </summary>
 /// <remarks>
-/// It is a notification, never the answer. It names the thing by token — and
-/// the payment beside it when money moved — and nothing else; ask the gateway
-/// what became of it (<c>RetrieveOrderAsync</c>, <c>RetrievePaymentLinkAsync</c>,
-/// <c>RetrieveSubscriptionAsync</c>, <c>RetrievePaymentAsync</c>) and act on
+/// It is a notification, never the answer. It names the thing by token — the
+/// payer's payment at it too for a link, and the payment beside it when money
+/// moved — and nothing else; ask the gateway what became of it
+/// (<c>RetrieveOrdersAsync</c>, <c>RetrieveLinkPaymentsAsync</c>,
+/// <c>RetrieveSubscriptionsAsync</c>, <c>RetrievePaymentsAsync</c>) and act on
 /// that. A word may arrive more than once; the id tells the copies apart.
 /// </remarks>
 public sealed record Webhook
@@ -24,6 +25,7 @@ public sealed record Webhook
         CreatedAt = Read.NonEmptyString(body.Field("created_at"));
         OrderToken = Read.NonEmptyString(body.Field("order").Field("token"));
         PaymentLinkToken = Read.NonEmptyString(body.Field("payment_link").Field("token"));
+        LinkPaymentToken = Read.NonEmptyString(body.Field("link_payment").Field("token"));
         SubscriptionToken = Read.NonEmptyString(body.Field("subscription").Field("token"));
         TransactionToken = Read.NonEmptyString(body.Field("transaction").Field("token"));
     }
@@ -42,6 +44,9 @@ public sealed record Webhook
 
     /// <summary>The payment link, for the <c>payment_link.*</c> events.</summary>
     public string? PaymentLinkToken { get; }
+
+    /// <summary>The payer's payment at the link, beside the link on the <c>payment_link.*</c> events.</summary>
+    public string? LinkPaymentToken { get; }
 
     /// <summary>The subscription, for the <c>subscription.*</c> events.</summary>
     public string? SubscriptionToken { get; }

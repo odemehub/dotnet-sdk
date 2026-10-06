@@ -33,6 +33,7 @@ public sealed record Order
         Status = Read.Enum<OrderStatus>(order.Field("status"));
         Items = Read.List(order.Field("items"), item => new Item(item));
         ShippingMethod = shippingMethod.ValueKind == JsonValueKind.Object ? new ShippingMethod(shippingMethod) : null;
+        Discount = Discount.Of(order.Field("discount"));
         Subtotal = Read.String(order.Field("subtotal"));
         ShippingAmount = Read.String(order.Field("shipping_amount"));
         TaxAmount = Read.String(order.Field("tax_amount"));
@@ -67,16 +68,19 @@ public sealed record Order
     /// <summary>The way the payer picked; null until they have, or when none was offered.</summary>
     public ShippingMethod? ShippingMethod { get; }
 
-    /// <summary>What the lines come to before tax.</summary>
+    /// <summary>The coupon the payer put on the order at checkout; null when none was.</summary>
+    public Discount? Discount { get; }
+
+    /// <summary>What the lines come to before tax, less the coupon.</summary>
     public string Subtotal { get; }
 
     /// <summary>What the picked way of sending comes to before tax.</summary>
     public string ShippingAmount { get; }
 
-    /// <summary>The tax the lines and the sending carry.</summary>
+    /// <summary>The tax the lines and the sending carry, less the coupon.</summary>
     public string TaxAmount { get; }
 
-    /// <summary>What the order comes to, added up by the gateway: the lines and the picked way of sending.</summary>
+    /// <summary>What the order comes to, added up by the gateway: the lines less the coupon, and the picked way of sending.</summary>
     public string Amount { get; }
 
     public Currency Currency { get; }

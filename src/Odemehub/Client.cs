@@ -106,9 +106,10 @@ public sealed class Client
     }
 
     /// <summary>
-    /// Open an order to be paid on the gateway's own page, or overwrite the
-    /// open one already under the same reference. Nothing is charged here; the
-    /// customer is sent to the address that comes back and pays there.
+    /// Open an order to be paid on the gateway's own page: a new one under a
+    /// new token on every call, even under a reference already sent. Nothing
+    /// is charged here; the customer is sent to the address that comes back
+    /// and pays there.
     /// </summary>
     public async Task<OrderDetails> CreateOrderAsync(CreateOrder order, CancellationToken cancellationToken = default)
     {
@@ -132,8 +133,9 @@ public sealed class Client
     }
 
     /// <summary>
-    /// Open a payment link, or overwrite the one already under the same
-    /// reference. The address that comes back is the link itself.
+    /// Open a payment link: a new one under a new token on every call, even
+    /// under a reference already sent. The address that comes back is the
+    /// link itself.
     /// </summary>
     public async Task<PaymentLinkDetails> CreatePaymentLinkAsync(CreatePaymentLink link, CancellationToken cancellationToken = default)
     {
@@ -150,8 +152,9 @@ public sealed class Client
     }
 
     /// <summary>
-    /// Change a payment link: its lines, its last day, whether it takes
-    /// payments. Only what is sent is written.
+    /// Change a payment link: its lines or the amounts the payer may pick, its
+    /// money, its last day, whether it takes payments. Only what is sent is
+    /// written.
     /// </summary>
     public async Task<PaymentLinkDetails> UpdatePaymentLinkAsync(UpdatePaymentLink link, CancellationToken cancellationToken = default)
     {
@@ -159,9 +162,19 @@ public sealed class Client
     }
 
     /// <summary>
+    /// The payments made at the team's links as they stand — what was paid,
+    /// at which link, by whom, and the payment that paid it once it went
+    /// through. They are opened by the payers, so they are only asked after.
+    /// </summary>
+    public async Task<LinkPaymentList> RetrieveLinkPaymentsAsync(RetrieveLinkPayments linkPayments, CancellationToken cancellationToken = default)
+    {
+        return new LinkPaymentList(await SendAsync(linkPayments, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
     /// Open a subscription, its first renewal to be paid on the gateway's own
-    /// page and the rest taken from the card kept then; or overwrite the one
-    /// already under the same reference while nothing has been paid on it.
+    /// page and the rest taken from the card kept then: a new one under a new
+    /// token on every call, even under a reference already sent.
     /// </summary>
     public async Task<SubscriptionDetails> CreateSubscriptionAsync(CreateSubscription subscription, CancellationToken cancellationToken = default)
     {

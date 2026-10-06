@@ -19,7 +19,7 @@ namespace Odemehub.Requests;
 /// </remarks>
 public sealed class CreateSubscription : CheckoutMessage
 {
-    /// <summary>The key the subscription is known by in the calling system. Has to carry at least one digit.</summary>
+    /// <summary>The key the subscription is known by in the calling system. Has to carry at least one digit; it need not be unique.</summary>
     public required string Reference { get; init; }
 
     /// <summary>How often a renewal comes round.</summary>

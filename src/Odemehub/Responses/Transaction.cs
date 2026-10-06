@@ -10,7 +10,8 @@ namespace Odemehub.Responses;
 /// attempts apart and see where each got to. Where it stands is said twice on
 /// purpose — the attempt's own state, and what became of the money, which can
 /// move on to refunded long after the attempt is over. A payment made at an
-/// order, a payment link or a subscription names it.
+/// order, a payment link or a subscription names it; one at a link names the
+/// payer's payment at it as well.
 /// </summary>
 public sealed record Transaction
 {
@@ -37,6 +38,7 @@ public sealed record Transaction
         Conversion = conversion.ValueKind == JsonValueKind.Object ? new Conversion(conversion) : null;
         OrderToken = Read.NonEmptyString(transaction.Field("order").Field("token"));
         PaymentLinkToken = Read.NonEmptyString(transaction.Field("payment_link").Field("token"));
+        LinkPaymentToken = Read.NonEmptyString(transaction.Field("link_payment").Field("token"));
         SubscriptionToken = Read.NonEmptyString(transaction.Field("subscription").Field("token"));
         SavedCard = transaction.Field("saved_card").ValueKind == JsonValueKind.Object ? new SavedCard(transaction.Field("saved_card")) : null;
     }
@@ -91,13 +93,16 @@ public sealed record Transaction
     /// <summary>The token of the payment link this attempt was at; null when it was at none.</summary>
     public string? PaymentLinkToken { get; }
 
+    /// <summary>The token of the payer's payment at the link this attempt was at, there whenever <see cref="PaymentLinkToken"/> is; null otherwise.</summary>
+    public string? LinkPaymentToken { get; }
+
     /// <summary>The token of the subscription this attempt paid a renewal of; null when it paid none.</summary>
     public string? SubscriptionToken { get; }
 
-    /// <summary>Whether the attempt went through.</summary>
     /// <summary>The card the payment kept, when it asked to keep one and went through; null otherwise.</summary>
     public SavedCard? SavedCard { get; }
 
+    /// <summary>Whether the attempt went through.</summary>
     public bool IsSuccessful => Status == TransactionStatus.Successful;
 }
 
