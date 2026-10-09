@@ -169,6 +169,7 @@ var created = await client.CreateOrderAsync(new CreateOrder
     Customer = customer,                                   // bilinen kadarı; kalanı sayfada sorulur. Hiç verilmeyebilir.
     RequiresShipping = true,                               // ödeyen adresini ve gönderim yöntemini sayfada seçer
     CancelUrl = "https://magazam.com/sepet",
+    EmailsCustomer = true,                                 // ödeme tamamlanınca fatura adresindeki e-postaya bilgilendirme gider
 });
 
 return Results.Redirect(created.Order.CheckoutUrl!);       // müşteriyi buraya gönderin
@@ -176,7 +177,9 @@ return Results.Redirect(created.Order.CheckoutUrl!);       // müşteriyi buraya
 
 Siparişte müşterinin her parçası isteğe bağlıdır: `Reference`, `BillingAddress`, `ShippingAddress` ya da hiçbiri. Verilenler ödeme sayfasında dolu gelir, kalanı ödeyene sorulur. Referans verilmezse ödeyen müşteri listenize yazılmaz. `SaveAsProduct = true` olan kalem referansıyla ürün listenize yazılır (referans zorunlu); `TaxRate` verilmezse kalem vergisizdir. Gönderim yöntemleri istekte gönderilmez: panelinizdeki **Gönderim Yöntemleri** listesinden ödeyenin adresine uyanlar sunulur.
 
-Yanıttaki `Order` siparişi bütünüyle taşır: `Token`, `Reference`, `Description`, `PaymentProviderToken`, `Status` (`OrderStatus.Open` / `Paid`), `Items`, `ShippingMethod` (ödeyenin seçtiği), `Discount`, `Subtotal`, `ShippingAmount`, `TaxAmount`, `Amount`, `Currency`, `IsTest`, `CreatedAt`, `CheckoutUrl` (ödenince `null`), `Transaction` (ödeyen işlem; açıkken `null`) ve `Customer`. Müşteri yanıtın üst seviyesinde de durur: `created.Customer` ile `created.Order.Customer` aynıdır; listelerde her siparişin kendi `Customer`'ı vardır.
+**Müşteri kilidi.** `LocksCustomer = true` gönderilirse ödeme sayfası müşteri bilgisi sormaz; gönderdiğiniz müşteriyi değiştirilemez şekilde gösterir ve ödemeyi onunla alır. Bu durumda fatura adresi eksiksiz olmalıdır; `RequiresShipping = true` ise gönderim adresi de (gönderilmezse fatura adresi kullanılır). Eksik alan varsa geçit `ValidationException` ile reddeder.
+
+Yanıttaki `Order` siparişi bütünüyle taşır: `Token`, `Reference`, `Description`, `PaymentProviderToken`, `Status` (`OrderStatus.Open` / `Paid`), `RequiresShipping`, `LocksCustomer`, `EmailsCustomer`, `Items`, `ShippingMethod` (ödeyenin seçtiği), `Discount`, `Subtotal`, `ShippingAmount`, `TaxAmount`, `Amount`, `Currency`, `IsTest`, `CreatedAt`, `CheckoutUrl` (ödenince `null`), `Transaction` (ödeyen işlem; açıkken `null`) ve `Customer`. Müşteri yanıtın üst seviyesinde de durur: `created.Customer` ile `created.Order.Customer` aynıdır; listelerde her siparişin kendi `Customer`'ı vardır.
 
 **İndirim.** Kupon API'den gönderilmez; ödeyen kodu ödeme sayfasında girer. Kupon kullanıldıysa `Order.Discount` kodu (`Code`) ve kalemlerden düşülen tutarı (`Amount`) taşır, kullanılmadıysa `null`'dır. Siparişin `Subtotal`, `TaxAmount` ve `Amount` değerleri indirim düşülmüş hâlidir; kupon gönderim ücretinden düşülmez.
 
@@ -209,7 +212,7 @@ var link = await client.CreatePaymentLinkAsync(new CreatePaymentLink
     Currency = Currency.TRY,
     Reference = "LNK-1",                 // boş bırakılırsa geçit LINK{n} üretir; tekil değildir
     ExpiresAt = "2026-12-31",            // çalışma alanının saat dilimine göre son gün
-    EmailsPayer = true,                  // ödeme tamamlanınca ödeyene e-posta gider
+    EmailsCustomer = true,               // ödeme tamamlanınca ödeyene, sayfada verdiği adrese e-posta gider
 });
 
 link.PaymentLink.CheckoutUrl;            // linkin kendisi; ödenemezken (kapalı, süresi geçmiş) null
@@ -255,7 +258,7 @@ await client.UpdatePaymentLinkAsync(new UpdatePaymentLink
 });
 ```
 
-Yanıttaki `PaymentLink` gönderilen alanların hepsini taşır: `AmountType`, `ItemName`, `PredefinedAmounts`, `TaxRate`, `TaxMode`, `CurrencyType`, `Currencies`, `EmailsPayer`. Tipin kullanmadığı alanlar geçitte boşaltılır (`null` döner). Güncellemede `Clear` `expires_at`, `description`, `payment_provider_token`, `item_name`, `predefined_amounts`, `tax_rate` ve `currencies` alanlarını boşaltabilir.
+Yanıttaki `PaymentLink` gönderilen alanların hepsini taşır: `AmountType`, `ItemName`, `PredefinedAmounts`, `TaxRate`, `TaxMode`, `CurrencyType`, `Currencies`, `EmailsCustomer`. Tipin kullanmadığı alanlar geçitte boşaltılır (`null` döner). Güncellemede `Clear` `expires_at`, `description`, `payment_provider_token`, `item_name`, `predefined_amounts`, `tax_rate` ve `currencies` alanlarını boşaltabilir.
 
 **Link ödemeleri.** Bir ödeyenin linki bir kez ödemesi bir link ödemesidir (`LinkPayment`); ödeyen ödemeye başlayınca açılır, bankası reddettikçe `LinkPaymentStatus.Open` kalır, ödeme geçince `Paid` olur. Referansı `LINKPAY{n}` biçimindedir ve link ödemesinin denemeleri de bu referansla görünür. Kimin ne ödediğini `RetrieveLinkPaymentsAsync()` verir:
 
@@ -285,6 +288,7 @@ var opened = await client.CreateSubscriptionAsync(new CreateSubscription
     Items = [new Item { Name = "Premium", UnitAmount = "99.90", Quantity = 1, TaxRate = "20" }],
     Customer = customer,
     RenewalLimit = 12,                   // boş: iptale kadar
+    EmailsCustomer = true,               // her durum değişiminde fatura adresindeki e-postaya bilgilendirme gider
 });
 
 return Results.Redirect(opened.Subscription.CheckoutUrl!);
@@ -309,6 +313,8 @@ await client.UpdateSubscriptionAsync(new UpdateSubscription { Token = token, Sta
 `Subscription.Discount`, ödeyenin ilk ödemede ödeme sayfasında girdiği kuponu taşır (yoksa `null`); kupon yalnız ilk ödemeye uygulanır. Aboneliğin kendi `Subtotal` / `TaxAmount` / `Amount` değerleri indirimsizdir; ilk yenilemede çekilen tutar `Renewal.Amount`'tadır.
 
 Kalemler gönderilirse ödenmemiş yenilemeye ve sonrakilere yansır. İptalde para iade edilmez; ödenmiş dönem sonuna kadar sürer, sonra abonelik biter. Ödenmiş dönem yoksa iptal hemen geçerlidir. `RenewalLimit` şimdiye kadar ödenen yenilemelerin altına inemez; sınırı kaldırmak için `Clear = ["renewal_limit"]`.
+
+`LocksCustomer` siparişteki gibi çalışır; yanıt da siparişteki gibi `RequiresShipping`, `LocksCustomer` ve `EmailsCustomer` taşır. `EmailsCustomer` açıkken dönem ödemesi alınamazsa ödeme sayfasının bağlantısı doğrudan müşteriye gider, size ayrıca e-posta gelmez.
 
 İlk ödemeden sonra yalnızca iptal (`Status`), ödeme sayısı (`RenewalLimit`), dönem (`Period`) ve aynı kalemlerin birim fiyatı değişebilir; müşteri dahil başka bir alan gönderilirse geçit 422 ile reddeder.
 
@@ -554,6 +560,11 @@ Sınırlar çalışma alanı başına ve dakikalıktır:
 | 60 istek / dk | `secure-payment`, `regular-payment`, `refund-payment`, `cancel-payment`, `create-saved-card`, `delete-saved-card` (300'e ek olarak) |
 
 Aşıldığında `RateLimitException` döner; `RetryAfter` kadar bekleyip aynı isteği yeniden gönderin.
+
+## 1.0.3'teki değişiklikler
+
+- **Müşteri kilidi ve müşteriye e-posta:** `CreateOrder`, `UpdateOrder`, `CreateSubscription` ve `UpdateSubscription` `LocksCustomer` ve `EmailsCustomer` alır. `Order` ve `Subscription` yanıtları `RequiresShipping`, `LocksCustomer` ve `EmailsCustomer` taşır.
+- **Kırıcı: ödeme linkinde `EmailsPayer` → `EmailsCustomer`.** `CreatePaymentLink`, `UpdatePaymentLink` ve `PaymentLink` yanıtında alanın adı değişti; geçit eski `emails_payer` adını artık kabul etmez.
 
 ## 1.0.2'deki değişiklikler
 

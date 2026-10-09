@@ -31,7 +31,7 @@ public sealed record PaymentLink
         Currency = Read.Enum<Currency>(link.Field("currency"));
         CurrencyType = Read.Enum<CurrencyType>(link.Field("currency_type"));
         Currencies = Read.OptionalList(link.Field("currencies"), Read.Enum<Currency>);
-        EmailsPayer = Read.Bool(link.Field("emails_payer"));
+        EmailsCustomer = Read.Bool(link.Field("emails_customer"));
         IsActive = Read.Bool(link.Field("is_active"));
         IsTest = Read.Bool(link.Field("is_test"));
         ExpiresAt = Read.NonEmptyString(link.Field("expires_at"));
@@ -89,8 +89,8 @@ public sealed record PaymentLink
     /// <summary>The moneys the payer may pick, <see cref="Currency"/> among them; null for a link paid in its one money.</summary>
     public IReadOnlyList<Currency>? Currencies { get; }
 
-    /// <summary>Whether the payer is sent an e-mail once their payment goes through.</summary>
-    public bool EmailsPayer { get; }
+    /// <summary>Whether the payer is sent an e-mail, at the address they give on the checkout page, once their payment goes through.</summary>
+    public bool EmailsCustomer { get; }
 
     /// <summary>Whether it takes payments now: switched on and its last day not gone by.</summary>
     public bool IsActive { get; }

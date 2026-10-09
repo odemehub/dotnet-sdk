@@ -25,6 +25,9 @@ public sealed record Subscription
         Description = Read.NonEmptyString(subscription.Field("description"));
         PaymentProviderToken = Read.NonEmptyString(subscription.Field("payment_provider_token"));
         Status = Read.Enum<SubscriptionStatus>(subscription.Field("status"));
+        RequiresShipping = Read.Bool(subscription.Field("requires_shipping"));
+        LocksCustomer = Read.Bool(subscription.Field("locks_customer"));
+        EmailsCustomer = Read.Bool(subscription.Field("emails_customer"));
         Period = Read.Enum<Period>(subscription.Field("period"));
         RenewalLimit = Read.OptionalInt(subscription.Field("renewal_limit"));
         RenewalsPaid = Read.Int(subscription.Field("renewals_paid"));
@@ -59,6 +62,15 @@ public sealed record Subscription
 
     /// <summary>Where it stands.</summary>
     public SubscriptionStatus Status { get; }
+
+    /// <summary>Whether the checkout page asks the payer where the goods go.</summary>
+    public bool RequiresShipping { get; }
+
+    /// <summary>Whether the customer stays as sent, shown and not asked on the checkout page.</summary>
+    public bool LocksCustomer { get; }
+
+    /// <summary>Whether the customer is sent an e-mail at their billing address.</summary>
+    public bool EmailsCustomer { get; }
 
     /// <summary>How often a renewal comes round.</summary>
     public Period Period { get; }

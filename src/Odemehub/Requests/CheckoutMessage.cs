@@ -47,6 +47,21 @@ public abstract class CheckoutMessage : Message
     /// </summary>
     public bool? RequiresShipping { get; init; }
 
+    /// <summary>
+    /// Whether the customer stays as sent: the checkout page asks the payer
+    /// nothing about who they are and only shows it. Takes a customer with a
+    /// whole billing address, and a whole shipping address too when the goods
+    /// are sent.
+    /// </summary>
+    public bool? LocksCustomer { get; init; }
+
+    /// <summary>
+    /// Whether the customer is sent an e-mail at their billing address: on an
+    /// order once it is paid, on a subscription whenever where it stands
+    /// changes.
+    /// </summary>
+    public bool? EmailsCustomer { get; init; }
+
 
     /// <summary>
     /// The group's fields, with what the caller left unsaid left out.
@@ -64,6 +79,8 @@ public abstract class CheckoutMessage : Message
             ("success_url", successUrl),
             ("cancel_url", CancelUrl),
             ("requires_shipping", RequiresShipping),
+            ("locks_customer", LocksCustomer),
+            ("emails_customer", EmailsCustomer),
             ("items", Item.ToBody(items)));
     }
 

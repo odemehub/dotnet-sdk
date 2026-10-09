@@ -31,6 +31,9 @@ public sealed record Order
         Description = Read.NonEmptyString(order.Field("description"));
         PaymentProviderToken = Read.NonEmptyString(order.Field("payment_provider_token"));
         Status = Read.Enum<OrderStatus>(order.Field("status"));
+        RequiresShipping = Read.Bool(order.Field("requires_shipping"));
+        LocksCustomer = Read.Bool(order.Field("locks_customer"));
+        EmailsCustomer = Read.Bool(order.Field("emails_customer"));
         Items = Read.List(order.Field("items"), item => new Item(item));
         ShippingMethod = shippingMethod.ValueKind == JsonValueKind.Object ? new ShippingMethod(shippingMethod) : null;
         Discount = Discount.Of(order.Field("discount"));
@@ -60,6 +63,15 @@ public sealed record Order
 
     /// <summary>Where the order stands: open until it is paid, then paid.</summary>
     public OrderStatus Status { get; }
+
+    /// <summary>Whether the checkout page asks the payer where the goods go.</summary>
+    public bool RequiresShipping { get; }
+
+    /// <summary>Whether the customer stays as sent, shown and not asked on the checkout page.</summary>
+    public bool LocksCustomer { get; }
+
+    /// <summary>Whether the customer is sent an e-mail at their billing address.</summary>
+    public bool EmailsCustomer { get; }
 
     /// <summary>What the order is made up of.</summary>
     public IReadOnlyList<Item> Items { get; }

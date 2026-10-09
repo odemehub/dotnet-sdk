@@ -50,8 +50,8 @@ public abstract class PaymentLinkMessage : Message
     /// <summary>The other moneys the payer may pick besides the link's own; needed when the payer picks the money.</summary>
     public IReadOnlyList<Currency>? Currencies { get; init; }
 
-    /// <summary>Whether the payer is sent an e-mail once their payment goes through. Left out on a new link, they are not.</summary>
-    public bool? EmailsPayer { get; init; }
+    /// <summary>Whether the payer is sent an e-mail, at the address they give on the checkout page, once their payment goes through. Left out on a new link, they are not.</summary>
+    public bool? EmailsCustomer { get; init; }
 
     /// <summary>The last day the link may be paid, as <c>YYYY-MM-DD</c> in the team's timezone; today or later. Left out on a new link, it never runs out.</summary>
     public string? ExpiresAt { get; init; }
@@ -79,7 +79,7 @@ public abstract class PaymentLinkMessage : Message
             ("currency", Wire.Of(currency)),
             ("currency_type", Wire.Of(CurrencyType)),
             ("currencies", Fields.List(Currencies?.Select(money => Wire.Of<Currency>(money)))),
-            ("emails_payer", EmailsPayer),
+            ("emails_customer", EmailsCustomer),
             ("expires_at", ExpiresAt),
             ("is_active", IsActive),
             ("items", Item.ToBody(items)));
