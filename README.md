@@ -4,24 +4,41 @@
 
 İstemci her isteği gizli anahtarınızla imzalar, gelen her yanıtın imzasını doğrular. Siz imza, başlık ya da JSON ayrıntılarıyla uğraşmazsınız. Her uç nokta için bir metot vardır ve adı uç noktanın adıdır: `create-order` için `CreateOrderAsync()`, `retrieve-saved-cards` için `RetrieveSavedCardsAsync()`. Yalnızca .NET'in kendi `HttpClient`'ını ve `System.Text.Json`'ını kullanır; başka paket gerekmez.
 
+Uç noktaların, alanların ve akışların ayrıntılı anlatımı geliştirici dokümantasyonundadır: [dev.odemehub.com](https://dev.odemehub.com/).
+
 ## Kurulum
 
 .NET 8 ve üzeri gerekir.
 
+Paket henüz NuGet'te yayında değildir. SDK'yı kaynağından alıp projenize proje referansıyla ekleyin:
+
 ```bash
-dotnet add package Odemehub.Sdk
+git clone --branch v1.0.4 https://github.com/odemehub/dotnet-sdk.git
+dotnet add <Projeniz>.csproj reference dotnet-sdk/src/Odemehub/Odemehub.csproj
 ```
+
+Komut projenizin `.csproj` dosyasına şu satırı ekler; yolu elle de yazabilirsiniz:
+
+```xml
+<ItemGroup>
+  <ProjectReference Include="..\dotnet-sdk\src\Odemehub\Odemehub.csproj" />
+</ItemGroup>
+```
+
+Yeni sürüme geçmek için klasörde o sürümün etiketine geçin (`git fetch --tags` ve `git checkout vX.Y.Z`).
 
 ## Yapılandırma
 
 Üç bilgi gerekir. Hepsi paneldeki **Entegrasyon** sayfasındadır (menünün en altında): Çalışma Alanı Kimliğiniz, API anahtarı ve gizli anahtar.
+
+Entegrasyonu sandbox'ta (`https://sandbox.odemehub.com`) geliştirin; sandbox'ta hesap açın ve bilgileri oradaki panelden alın. Canlıya çıkarken `app.odemehub.com` üzerinde açtığınız hesabın bilgileriyle `BaseUrl`'i `https://app.odemehub.com` yapın.
 
 ```csharp
 using Odemehub;
 
 var client = new Client(new Options
 {
-    BaseUrl = "https://app.odemehub.com",
+    BaseUrl = "https://sandbox.odemehub.com",
     Team = "1000000001",                                   // Çalışma Alanı Kimliği
     ApiKey = Environment.GetEnvironmentVariable("ODEMEHUB_API_KEY")!,
     ApiSecret = Environment.GetEnvironmentVariable("ODEMEHUB_API_SECRET")!,
@@ -50,20 +67,22 @@ Müşteri hiçbir yere gitmez. Başarılı yanıt, paranın alındığı anlamı
 using Odemehub.Enums;
 using Odemehub.Requests;
 
-var customer = new Customer
+var billingAddress = new Address
+{
+    Firstname = "Ahmet",
+    Lastname = "Yılmaz",
+    Email = "ahmet@ornek.com",
+    Phone = "05551112233",
+    AddressLine = "Kızılırmak Mah. Dumlupınar Blv. No:3",   // gövdede "address"
+    District = "Çankaya",
+    Province = "Ankara",
+    Country = "Türkiye",
+};
+
+var customer = new PaymentCustomer
 {
     Reference = "musteri-88",                 // sizdeki müşteri anahtarı; kart saklanacaksa zorunlu
-    BillingAddress = new Address
-    {
-        Firstname = "Ahmet",
-        Lastname = "Yılmaz",
-        Email = "ahmet@ornek.com",
-        Phone = "05551112233",
-        AddressLine = "Kızılırmak Mah. Dumlupınar Blv. No:3",   // gövdede "address"
-        District = "Çankaya",
-        Province = "Ankara",
-        Country = "Türkiye",
-    },
+    BillingAddress = billingAddress,          // zorunlu
 };
 
 var card = new Card
@@ -95,7 +114,7 @@ if (payment.Result.IsSuccessful)
 
 Reddedilen ödeme de bir sonuçtur: `Result.IsSuccessful` false, `Result.Message` neden. Yalnızca geçit isteğin kendisini reddederse (hatalı alan, yetki, hız sınırı, bulunamayan kayıt) istisna fırlatılır.
 
-Ödemede müşterinin fatura adresi (`BillingAddress`) sekiz alanıyla eksiksiz gönderilir; şirket adına alışverişte `CompanyTitle`, `TaxNumber` ve `TaxOffice` birlikte eklenir. Ödemeye gönderim adresi gönderilmez.
+Ödemede müşterinin fatura adresi (`BillingAddress`) sekiz alanıyla eksiksiz gönderilir; şirket adına alışverişte `CompanyTitle`, `TaxNumber` ve `TaxOffice` birlikte eklenir. Ödeme ve kart saklama müşteriyi `PaymentCustomer` ile alır: yalnızca `Reference` ve `BillingAddress`. Gönderim adresi sipariş ve aboneliğe aittir; onlar `Customer` alır.
 
 **Müşteriler.** `Customer.Reference` gönderdiğiniz ödeme başarılı olunca geçit müşteriyi o referansla çalışma alanınızın müşteri listesine yazar ya da günceller; başarısız ödeme müşteriye dokunmaz. Referans göndermezseniz ödeme yine alınır ama müşteri kaydedilmez ve kart saklanamaz. Saklanan kart müşteriye bağlanır; müşterinin son ödeme yaptığı kart varsayılan kartı olur. Kayıtlı kartla ödemede `Customer.Reference` kartın saklandığı referansla aynı olmalıdır.
 
@@ -166,7 +185,7 @@ var created = await client.CreateOrderAsync(new CreateOrder
         new Item { Name = "Kulaklık", UnitAmount = "1200.00", Quantity = 1, TaxRate = "20", Reference = "SKU-1", SaveAsProduct = true },
         new Item { Name = "Hediye paketi", UnitAmount = "25.00", Quantity = 1, TaxRate = "20", Image = "https://magazam.com/img/paket.jpg" },
     ],
-    Customer = customer,                                   // bilinen kadarı; kalanı sayfada sorulur. Hiç verilmeyebilir.
+    Customer = new Customer { Reference = "musteri-88", BillingAddress = billingAddress },   // bilinen kadarı; kalanı sayfada sorulur. Hiç verilmeyebilir.
     RequiresShipping = true,                               // ödeyen adresini ve gönderim yöntemini sayfada seçer
     CancelUrl = "https://magazam.com/sepet",
     EmailsCustomer = true,                                 // ödeme tamamlanınca fatura adresindeki e-postaya bilgilendirme gider
@@ -286,7 +305,7 @@ var opened = await client.CreateSubscriptionAsync(new CreateSubscription
     Period = Period.Monthly,             // Daily | Weekly | Monthly | Annually
     SuccessUrl = "https://magazam.com/abonelik/donus",
     Items = [new Item { Name = "Premium", UnitAmount = "99.90", Quantity = 1, TaxRate = "20" }],
-    Customer = customer,
+    Customer = new Customer { Reference = "musteri-88", BillingAddress = billingAddress },
     RenewalLimit = 12,                   // boş: iptale kadar
     EmailsCustomer = true,               // her durum değişiminde fatura adresindeki e-postaya bilgilendirme gider
 });
@@ -322,7 +341,7 @@ Dönem bitince yeni yenileme açılır ve müşterinin varsayılan kartından ç
 
 ## Webhook
 
-Sipariş ödendiğinde, link ödemesi alındığında, abonelik durum değiştirdiğinde, API ödemesi bittiğinde ve bir ödeme iade ya da iptal edildiğinde geçidin **kendi sunucusu** imzalı bir JSON POST gönderir. Müşteri sekmeyi kapatıp `CallbackUrl` / `SuccessUrl` adresinize hiç dönmese de bu bildirim gelir. Adresler kodda verilmez; panelde **Ayarlar → Webhook** sayfasında olay ve adres seçilerek tanımlanır.
+Sipariş ödendiğinde, link ödemesi alındığında, abonelik durum değiştirdiğinde, API ödemesi bittiğinde ve bir ödeme iade ya da iptal edildiğinde geçidin **kendi sunucusu** imzalı bir JSON POST gönderir. Müşteri sekmeyi kapatıp `CallbackUrl` / `SuccessUrl` adresinize hiç dönmese de bu bildirim gelir. Adresler kodda verilmez; panelde **Ödeme Ayarları → Webhook** sayfasında tanımlanır. Bir adres birden çok olayı dinleyebilir; **Tüm olaylar** seçilirse her olay o adrese gelir. Aynı olay birden çok adreste seçilirse bildirim her adrese ayrı gider.
 
 | Kaynak | Olaylar |
 | --- | --- |
@@ -382,7 +401,9 @@ app.MapPost("/odemehub/webhook", async (HttpRequest request, Client client) =>
 });
 ```
 
-`payment_link.*` olaylarında gövde linkin token'ının yanında ödeyenin link ödemesini (`LinkPaymentToken`) da taşır. Abonelik ve link ödemelerinin iade/iptal olaylarında `TransactionToken` da gelir; `RetrievePaymentsAsync()` yanıtındaki `OrderToken` / `PaymentLinkToken` / `LinkPaymentToken` / `SubscriptionToken` ödemenin gerçekten o kaynağa ait olduğunu gösterir. Gövde `Discount` taşımaz; indirimi ilgili `Retrieve*Async()` yanıtı verir. Yalnızca doğrulamak için `client.VerifyWebhook(...)` `bool` döner. 2xx dışında bir yanıt (ya da yanıtsızlık) başarısız sayılır; geçit 60 sn, 5 dk, 15 dk ve 30 dk arayla toplam 5 kez dener ve yönlendirmeleri izlemez.
+`payment_link.*` olaylarında gövde linkin token'ının yanında ödeyenin link ödemesini (`LinkPaymentToken`) da taşır. Abonelik ve link ödemelerinin iade/iptal olaylarında `TransactionToken` da gelir; `RetrievePaymentsAsync()` yanıtındaki `OrderToken` / `PaymentLinkToken` / `LinkPaymentToken` / `SubscriptionToken` ödemenin gerçekten o kaynağa ait olduğunu gösterir. Gövde `Discount` taşımaz; indirimi ilgili `Retrieve*Async()` yanıtı verir. Yalnızca doğrulamak için `client.VerifyWebhook(...)` `bool` döner.
+
+İlk gönderim olaydan 30 saniye sonra yapılır. 2xx dışında bir yanıt (ya da yanıtsızlık) başarısız sayılır; geçit 60 sn, 5 dk, 15 dk ve 30 dk arayla toplam 5 kez dener ve yönlendirmeleri izlemez. Adres panelden kapatılır ya da silinirse otomatik gönderimler durur. Denemeleri biten bildirim panelde ilgili kaydın sayfasından elle yeniden gönderilebilir; elle gönderim beklemeden, aynı `id` ve gövdeyle, bildirim kaydındaki adrese gider.
 
 ## Kayıtlı kartlar
 
@@ -560,6 +581,15 @@ Sınırlar çalışma alanı başına ve dakikalıktır:
 | 60 istek / dk | `secure-payment`, `regular-payment`, `refund-payment`, `cancel-payment`, `create-saved-card`, `delete-saved-card` (300'e ek olarak) |
 
 Aşıldığında `RateLimitException` döner; `RetryAfter` kadar bekleyip aynı isteği yeniden gönderin.
+
+## 1.0.4'teki değişiklikler
+
+- **Sandbox'la başlayan kurulum:** README ve `Options.BaseUrl` açıklaması entegrasyonu `https://sandbox.odemehub.com` üzerinde geliştirip canlıya çıkarken `BaseUrl`'i `https://app.odemehub.com` yapmayı anlatır.
+- **Kaynaktan kurulum:** paket henüz NuGet'te olmadığından README `dotnet add package` yerine depoyu klonlayıp proje referansıyla eklemeyi anlatır.
+- **`Requests.PaymentCustomer`:** ödemenin ve kart saklamanın müşterisi; yalnızca `Reference` ve `BillingAddress` (`required`) taşır.
+- **Webhook anlatımı güncellendi:** menü **Ödeme Ayarları → Webhook**, bir adres birden çok olay (ya da **Tüm olaylar**), ilk gönderim olaydan 30 saniye sonra, kapatılan ya da silinen adrese otomatik gönderim yapılmaz, elle yeniden gönderim bildirim kaydındaki adrese gider.
+- **Dokümantasyon bağlantısı:** README ve `.csproj` `PackageProjectUrl` geliştirici dokümantasyonunu ([dev.odemehub.com](https://dev.odemehub.com/)) gösterir.
+- **Kırıcı: `RegularPayment`, `SecurePayment` ve `CreateSavedCard` `Customer` alanı artık `Customer` değil `PaymentCustomer` tipindedir.** Geçit ödemede ve kart saklamada gönderim adresini 422 ile reddettiği için `ShippingAddress` taşıyabilen `Customer` bu isteklerden çıktı. Ödeme kodunda `new Customer { … }` → `new PaymentCustomer { … }`; `BillingAddress` artık zorunludur. Sipariş ve abonelik `Customer` almaya devam eder.
 
 ## 1.0.3'teki değişiklikler
 

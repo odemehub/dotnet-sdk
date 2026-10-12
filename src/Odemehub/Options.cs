@@ -12,7 +12,7 @@ public sealed class Options
     /// <summary>The header the API key travels in.</summary>
     public const string ApiKeyHeader = "X-Api-Key";
 
-    /// <summary>The address the application is served from, e.g. https://app.odemehub.com.</summary>
+    /// <summary>The address the application is served from, e.g. https://sandbox.odemehub.com while building and https://app.odemehub.com once live.</summary>
     public required string BaseUrl { get; init; }
 
     /// <summary>The team the payments are made on behalf of: the ten-digit workspace id the Entegrasyon page shows.</summary>

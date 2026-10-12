@@ -40,7 +40,7 @@ public abstract class Payment : Message
     /// them, their reference. A payment that keeps its card, or is made with a
     /// kept one, has to name the customer the card is theirs.
     /// </summary>
-    public required Customer Customer { get; init; }
+    public required PaymentCustomer Customer { get; init; }
 
     /// <summary>The card typed in. Left out only when a kept card is named instead.</summary>
     public Card? Card { get; init; }

@@ -11,10 +11,10 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
 
     <PackageId>Odemehub.Sdk</PackageId>
-    <Version>1.0.3</Version>
+    <Version>1.0.4</Version>
     <Description>ödemehub ödeme geçidi için .NET istemcisi.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageProjectUrl>https://github.com/odemehub/dotnet-sdk</PackageProjectUrl>
+    <PackageProjectUrl>https://dev.odemehub.com/</PackageProjectUrl>
     <RepositoryUrl>https://github.com/odemehub/dotnet-sdk.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
