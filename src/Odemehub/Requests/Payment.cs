@@ -39,9 +39,10 @@ public abstract class Payment : Message
     /// Who is paying: the whole billing address, or what is known of it where
     /// the team fills the rest from its default payer, and, when the merchant
     /// keeps them, their reference. A payment that keeps its card, or is made with a
-    /// kept one, has to name the customer the card is theirs.
+    /// kept one, has to name the customer the card is theirs. Left out, it is
+    /// not sent, which only a team with a default payer may do.
     /// </summary>
-    public required PaymentCustomer Customer { get; init; }
+    public PaymentCustomer? Customer { get; init; }
 
     /// <summary>The card typed in. Left out only when a kept card is named instead.</summary>
     public Card? Card { get; init; }
@@ -83,7 +84,7 @@ public abstract class Payment : Message
                 ("installment_number", InstallmentNumber),
                 ("ip", Ip),
                 ("saved_card_token", SavedCardToken))),
-            ("customer", Customer.ToBody()),
+            ("customer", Customer?.ToBody()),
             ("card", Card?.ToBody()));
     }
 }

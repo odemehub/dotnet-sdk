@@ -52,14 +52,19 @@ public sealed class PaymentCustomer
     /// <summary>The key the merchant keeps this customer under in its own system.</summary>
     public string? Reference { get; init; }
 
-    /// <summary>Where the bill goes: all eight person fields, unless the team fills what is left out from its default payer, and, when they buy for one, the three company fields together.</summary>
-    public required Address BillingAddress { get; init; }
+    /// <summary>
+    /// Where the bill goes: all eight person fields, unless the team fills
+    /// what is left out from its default payer, and, when they buy for one,
+    /// the three company fields together. Left out, it is not sent, which
+    /// only a team with a default payer may do.
+    /// </summary>
+    public Address? BillingAddress { get; init; }
 
     internal JsonObject ToBody()
     {
         return Fields.Said(
             ("reference", Reference),
-            ("billing_address", BillingAddress.ToBody()));
+            ("billing_address", BillingAddress?.ToBody()));
     }
 }
 
@@ -70,9 +75,9 @@ public sealed class PaymentCustomer
 /// Ödeyen); an order or a subscription takes whatever is known.
 /// </summary>
 /// <remarks>
-/// The three company fields are read on the billing address only, and always
-/// together: the gateway turns down an address that names one of them without
-/// the others.
+/// The three company fields belong on the billing address only — the gateway
+/// turns down a shipping address that carries them — and always together: it
+/// turns down an address that names one of them without the others.
 /// </remarks>
 public sealed class Address
 {

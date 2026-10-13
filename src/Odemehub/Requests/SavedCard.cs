@@ -17,7 +17,7 @@ namespace Odemehub.Requests;
 /// </remarks>
 public sealed class CreateSavedCard : Message
 {
-    /// <summary>Who the card belongs to: the reference and the whole billing address, both required; what is left out of the address is filled from the team's default payer, where it uses one.</summary>
+    /// <summary>Who the card belongs to: the reference, required, and the whole billing address; what is left out of the address, or the address itself, is filled from the team's default payer, where it uses one.</summary>
     public required PaymentCustomer Customer { get; init; }
 
     public required Card Card { get; init; }

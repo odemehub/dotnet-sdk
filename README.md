@@ -13,7 +13,7 @@ Uç noktaların, alanların ve akışların ayrıntılı anlatımı geliştirici
 Paket henüz NuGet'te yayında değildir. SDK'yı kaynağından alıp projenize proje referansıyla ekleyin:
 
 ```bash
-git clone --branch v1.0.4 https://github.com/odemehub/dotnet-sdk.git
+git clone --branch v1.0.5 https://github.com/odemehub/dotnet-sdk.git
 dotnet add <Projeniz>.csproj reference dotnet-sdk/src/Odemehub/Odemehub.csproj
 ```
 
@@ -82,7 +82,7 @@ var billingAddress = new Address
 var customer = new PaymentCustomer
 {
     Reference = "musteri-88",                 // sizdeki müşteri anahtarı; kart saklanacaksa zorunlu
-    BillingAddress = billingAddress,          // zorunlu (Varsayılan Ödeyen açıksa alanları eksik olabilir)
+    BillingAddress = billingAddress,          // zorunlu (Varsayılan Ödeyen açıksa eksik ya da hiç verilmeyebilir)
 };
 
 var card = new Card
@@ -114,7 +114,7 @@ if (payment.Result.IsSuccessful)
 
 Reddedilen ödeme de bir sonuçtur: `Result.IsSuccessful` false, `Result.Message` neden. Yalnızca geçit isteğin kendisini reddederse (hatalı alan, yetki, hız sınırı, bulunamayan kayıt) istisna fırlatılır.
 
-Ödemede müşterinin fatura adresi (`BillingAddress`) sekiz alanıyla eksiksiz gönderilir (panelde Varsayılan Ödeyen açıksa eksik bırakılabilir); şirket adına alışverişte `CompanyTitle`, `TaxNumber` ve `TaxOffice` birlikte eklenir. Ödeme ve kart saklama müşteriyi `PaymentCustomer` ile alır: yalnızca `Reference` ve `BillingAddress`. Gönderim adresi sipariş ve aboneliğe aittir; onlar `Customer` alır.
+Ödemede müşterinin fatura adresi (`BillingAddress`) sekiz alanıyla eksiksiz gönderilir; şirket adına alışverişte `CompanyTitle`, `TaxNumber` ve `TaxOffice` birlikte eklenir. Panelde **Varsayılan Ödeyen** açıksa `Customer`, `BillingAddress` ve sekiz alanın her biri isteğe bağlıdır: verilmeyen alanlar ödeme sağlayıcısına varsayılan ödeyenin bilgisiyle gider, müşteri yalnızca gönderdiklerinizle yazılır. Verilmeyen nesne gövdeye yazılmaz; SDK bunu denetlemez, Varsayılan Ödeyen kapalıyken eksik adresi geçit 422 ile reddeder. Ödeme ve kart saklama müşteriyi `PaymentCustomer` ile alır: yalnızca `Reference` ve `BillingAddress`. Gönderim adresi sipariş ve aboneliğe aittir; onlar `Customer` alır.
 
 **Müşteriler.** `Customer.Reference` gönderdiğiniz ödeme başarılı olunca geçit müşteriyi o referansla çalışma alanınızın müşteri listesine yazar ya da günceller; başarısız ödeme müşteriye dokunmaz. Referans göndermezseniz ödeme yine alınır ama müşteri kaydedilmez ve kart saklanamaz. Saklanan kart müşteriye bağlanır; müşterinin son ödeme yaptığı kart varsayılan kartı olur. Kayıtlı kartla ödemede `Customer.Reference` kartın saklandığı referansla aynı olmalıdır.
 
@@ -296,7 +296,7 @@ foreach (var linkPayment in payments.LinkPayments)
 
 ## Abonelik
 
-İlk yenileme ödeme sayfasında ödenir ve kart orada müşteriye saklanır; sonrakiler müşterinin varsayılan kartından (son ödeme yaptığı kart) çekilir. Müşteri referansı zorunludur, çünkü kart o müşteriye bağlanır. Ödeme hesabı (verilen ya da varsayılan) kart saklamalı ve 3D ödeme almalı, planınız kayıtlı kartları kapsamalıdır.
+İlk yenileme ödeme sayfasında ödenir ve kart orada müşteriye saklanır; sonrakiler müşterinin varsayılan kartından (son ödeme yaptığı kart) çekilir. Müşteri referansı zorunludur, çünkü kart o müşteriye bağlanır. Ödeme hesabı (verilen ya da varsayılan) kart saklamalı ve 3D ödeme almalı, çalışma alanınızda **Kayıtlı Kartlar** modülü açık olmalıdır (**Abonelikler** açılınca o da açılır).
 
 ```csharp
 var opened = await client.CreateSubscriptionAsync(new CreateSubscription
@@ -421,7 +421,7 @@ await client.UpdateSavedCardAsync(new UpdateSavedCard { Token = cardToken });   
 await client.DeleteSavedCardAsync(new DeleteSavedCard { Token = cardToken });   // delete-saved-card/{token}
 ```
 
-Ödemesiz saklamada müşterinin referansı ve fatura adresi eksiksiz gönderilir; Varsayılan Ödeyen açıksa adres eksik olabilir. Güvenlik kodu, kartı küçük bir çekim yapıp geri vererek saklayan sağlayıcılar için gerekir; diğerlerinde boş bırakılabilir ve hiçbir yerde saklanmaz. Kayıtlı kart yanıtlarında kartın yalnızca ilk haneleri ve son dördü vardır.
+Ödemesiz saklamada müşterinin referansı ve fatura adresi eksiksiz gönderilir; Varsayılan Ödeyen açıksa adres eksik olabilir ya da hiç verilmeyebilir, referans yine zorunludur. Güvenlik kodu, kartı küçük bir çekim yapıp geri vererek saklayan sağlayıcılar için gerekir; diğerlerinde boş bırakılabilir ve hiçbir yerde saklanmaz. Kayıtlı kart yanıtlarında kartın yalnızca ilk haneleri ve son dördü vardır.
 
 ## İade ve iptal
 
@@ -546,7 +546,7 @@ Bütün hatalar `OdemehubException`'dan türer; tek bir `catch` hepsini yakalar.
 | Hata | Durum | Anlamı |
 | --- | --- | --- |
 | `AuthenticationException` | 401 | API anahtarı yanlış, imza tutmuyor ya da zaman damgası aralık dışında |
-| `ForbiddenException` | 403 | Çalışma alanı işlem yapamıyor (ödenmemiş bakiye, plan) ya da plan bu özelliği kapsamıyor |
+| `ForbiddenException` | 403 | Çalışma alanı işlem yapamıyor (ödenmemiş bakiye) ya da ucun modülü kapalı; açtırmak için bizimle iletişime geçin |
 | `NotFoundException` | 404 | Güncellenmek, silinmek, iade ya da iptal edilmek istenen kayıt yok (sorgularda boş liste döner) |
 | `ValidationException` | 422 | Alan hataları; `Errors` noktalı alan adıyla (`transaction.amount`, `order.items.0.name`) |
 | `RateLimitException` | 429 | İstek sınırı; `RetryAfter` saniye |
@@ -581,6 +581,12 @@ Sınırlar çalışma alanı başına ve dakikalıktır:
 | 60 istek / dk | `secure-payment`, `regular-payment`, `refund-payment`, `cancel-payment`, `create-saved-card`, `delete-saved-card` (300'e ek olarak) |
 
 Aşıldığında `RateLimitException` döner; `RetryAfter` kadar bekleyip aynı isteği yeniden gönderin.
+
+## 1.0.5'teki değişiklikler
+
+- **Varsayılan Ödeyen: fatura adresi isteğe bağlı.** `PaymentCustomer.BillingAddress` ile `RegularPayment` ve `SecurePayment`'ın `Customer` alanı artık `required` değildir (`Address?`, `PaymentCustomer?`); verilmezse gövdeye yazılmaz. Çalışma alanında Varsayılan Ödeyen açıksa geçit eksik fatura bilgisini varsayılan ödeyenden tamamlar; kapalıyken eskisi gibi 422 döner. `CreateSavedCard`'da `Customer` zorunlu kalır (`Reference` geçitte zorunludur), `BillingAddress` verilmeyebilir. Nesne başlatıcıyla yazılan mevcut kod değişmeden derlenir.
+- **403 açıklaması:** `ForbiddenException` ve hata tablosu artık ödenmemiş bakiyeyi ya da ucun modülünün kapalı olduğunu söyler (plan sistemi kalktı); modülü açtırmak için bizimle iletişime geçin. `Card.ShouldSave` ve `CreateSubscription` açıklamaları planı değil **Kayıtlı Kartlar** modülünü anar.
+- **`Address` açıklaması:** firma alanları (`CompanyTitle`, `TaxNumber`, `TaxOffice`) yalnız fatura adresinde gönderilir; gönderim adresinde verilirse geçit isteği 422 ile reddeder. Kod değişmedi.
 
 ## 1.0.4'teki değişiklikler
 

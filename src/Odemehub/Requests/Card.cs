@@ -31,9 +31,9 @@ public sealed class Card
     /// <summary>
     /// Whether the customer asked for this card to be kept after a successful
     /// payment, so they can pay with it again without typing it out. Needs a
-    /// customer reference to be kept under, a plan that covers saved cards and
-    /// an account whose provider keeps cards; one that cannot turns the
-    /// payment down on this field rather than declining it. Read only by
+    /// customer reference to be kept under, the Kayıtlı Kartlar module on and
+    /// an account whose provider keeps cards; short of any of them, the
+    /// payment is turned down on this field rather than declined. Read only by
     /// payments; left out, it is not sent.
     /// </summary>
     public bool? ShouldSave { get; init; }
