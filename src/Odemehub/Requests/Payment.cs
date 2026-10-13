@@ -36,8 +36,9 @@ public abstract class Payment : Message
     public required string Ip { get; init; }
 
     /// <summary>
-    /// Who is paying: the whole billing address and, when the merchant keeps
-    /// them, their reference. A payment that keeps its card, or is made with a
+    /// Who is paying: the whole billing address, or what is known of it where
+    /// the team fills the rest from its default payer, and, when the merchant
+    /// keeps them, their reference. A payment that keeps its card, or is made with a
     /// kept one, has to name the customer the card is theirs.
     /// </summary>
     public required PaymentCustomer Customer { get; init; }

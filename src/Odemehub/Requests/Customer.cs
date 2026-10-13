@@ -36,7 +36,9 @@ public sealed class Customer
 
 /// <summary>
 /// The customer a payment is made for or a card is kept for: the whole
-/// billing address and the merchant's own key for them. Nothing goes to a
+/// billing address, or what is known of it where the team fills the rest
+/// from its default payer (Varsayılan Ödeyen), and the merchant's own key
+/// for them. Nothing goes to a
 /// shipping address here; the gateway turns down a payment or a kept card
 /// that names one.
 /// </summary>
@@ -50,7 +52,7 @@ public sealed class PaymentCustomer
     /// <summary>The key the merchant keeps this customer under in its own system.</summary>
     public string? Reference { get; init; }
 
-    /// <summary>Where the bill goes: all eight person fields and, when they buy for one, the three company fields together.</summary>
+    /// <summary>Where the bill goes: all eight person fields, unless the team fills what is left out from its default payer, and, when they buy for one, the three company fields together.</summary>
     public required Address BillingAddress { get; init; }
 
     internal JsonObject ToBody()
@@ -63,8 +65,9 @@ public sealed class PaymentCustomer
 
 /// <summary>
 /// Where a customer is billed, or where their goods go. A payment and a kept
-/// card need the whole of the eight person fields on the billing address; an
-/// order or a subscription takes whatever is known.
+/// card need the whole of the eight person fields on the billing address,
+/// unless the team fills what is left out from its default payer (Varsayılan
+/// Ödeyen); an order or a subscription takes whatever is known.
 /// </summary>
 /// <remarks>
 /// The three company fields are read on the billing address only, and always

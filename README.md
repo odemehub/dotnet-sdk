@@ -82,7 +82,7 @@ var billingAddress = new Address
 var customer = new PaymentCustomer
 {
     Reference = "musteri-88",                 // sizdeki müşteri anahtarı; kart saklanacaksa zorunlu
-    BillingAddress = billingAddress,          // zorunlu
+    BillingAddress = billingAddress,          // zorunlu (Varsayılan Ödeyen açıksa alanları eksik olabilir)
 };
 
 var card = new Card
@@ -114,7 +114,7 @@ if (payment.Result.IsSuccessful)
 
 Reddedilen ödeme de bir sonuçtur: `Result.IsSuccessful` false, `Result.Message` neden. Yalnızca geçit isteğin kendisini reddederse (hatalı alan, yetki, hız sınırı, bulunamayan kayıt) istisna fırlatılır.
 
-Ödemede müşterinin fatura adresi (`BillingAddress`) sekiz alanıyla eksiksiz gönderilir; şirket adına alışverişte `CompanyTitle`, `TaxNumber` ve `TaxOffice` birlikte eklenir. Ödeme ve kart saklama müşteriyi `PaymentCustomer` ile alır: yalnızca `Reference` ve `BillingAddress`. Gönderim adresi sipariş ve aboneliğe aittir; onlar `Customer` alır.
+Ödemede müşterinin fatura adresi (`BillingAddress`) sekiz alanıyla eksiksiz gönderilir (panelde Varsayılan Ödeyen açıksa eksik bırakılabilir); şirket adına alışverişte `CompanyTitle`, `TaxNumber` ve `TaxOffice` birlikte eklenir. Ödeme ve kart saklama müşteriyi `PaymentCustomer` ile alır: yalnızca `Reference` ve `BillingAddress`. Gönderim adresi sipariş ve aboneliğe aittir; onlar `Customer` alır.
 
 **Müşteriler.** `Customer.Reference` gönderdiğiniz ödeme başarılı olunca geçit müşteriyi o referansla çalışma alanınızın müşteri listesine yazar ya da günceller; başarısız ödeme müşteriye dokunmaz. Referans göndermezseniz ödeme yine alınır ama müşteri kaydedilmez ve kart saklanamaz. Saklanan kart müşteriye bağlanır; müşterinin son ödeme yaptığı kart varsayılan kartı olur. Kayıtlı kartla ödemede `Customer.Reference` kartın saklandığı referansla aynı olmalıdır.
 
@@ -421,7 +421,7 @@ await client.UpdateSavedCardAsync(new UpdateSavedCard { Token = cardToken });   
 await client.DeleteSavedCardAsync(new DeleteSavedCard { Token = cardToken });   // delete-saved-card/{token}
 ```
 
-Ödemesiz saklamada müşterinin referansı ve fatura adresi eksiksiz gönderilir. Güvenlik kodu, kartı küçük bir çekim yapıp geri vererek saklayan sağlayıcılar için gerekir; diğerlerinde boş bırakılabilir ve hiçbir yerde saklanmaz. Kayıtlı kart yanıtlarında kartın yalnızca ilk haneleri ve son dördü vardır.
+Ödemesiz saklamada müşterinin referansı ve fatura adresi eksiksiz gönderilir; Varsayılan Ödeyen açıksa adres eksik olabilir. Güvenlik kodu, kartı küçük bir çekim yapıp geri vererek saklayan sağlayıcılar için gerekir; diğerlerinde boş bırakılabilir ve hiçbir yerde saklanmaz. Kayıtlı kart yanıtlarında kartın yalnızca ilk haneleri ve son dördü vardır.
 
 ## İade ve iptal
 
