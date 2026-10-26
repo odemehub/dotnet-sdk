@@ -27,7 +27,7 @@ public sealed class Item
     /// <summary>The merchant's own key for what is on the line, if it has one.</summary>
     public string? Reference { get; init; }
 
-    /// <summary>The https address of the picture shown beside the line at checkout.</summary>
+    /// <summary>The http or https address of the picture shown beside the line at checkout.</summary>
     public string? Image { get; init; }
 
     /// <summary>

@@ -99,7 +99,8 @@ public sealed class SecurePayment : Payment
     /// <summary>
     /// Where the customer's browser is posted back to once they are done at
     /// their bank, with the payment's token, the reference and a hint at how it
-    /// went. An address reachable from the internet.
+    /// went. An https address reachable from the internet; on the sandbox any
+    /// http or https address does, localhost and <c>.test</c> names included.
     /// </summary>
     public required string CallbackUrl { get; init; }
 

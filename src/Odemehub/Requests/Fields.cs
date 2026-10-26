@@ -63,4 +63,13 @@ internal static class Fields
     {
         return values is null ? null : new JsonArray(values.Select(value => (JsonNode?)value).ToArray());
     }
+
+    /// <summary>
+    /// Plain values under keys the caller names, as the body carries them;
+    /// null for none given, so it is left out like any other field not said.
+    /// </summary>
+    internal static JsonObject? Map(IEnumerable<KeyValuePair<string, string>>? values)
+    {
+        return values is null ? null : new JsonObject(values.Select(pair => KeyValuePair.Create(pair.Key, (JsonNode?)pair.Value)));
+    }
 }

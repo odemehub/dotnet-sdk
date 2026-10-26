@@ -106,6 +106,7 @@ public sealed record SavedCardList
         Result = new Result(body);
         CreatedFrom = Read.NonEmptyString(body.Field("created_from"));
         CreatedTo = Read.NonEmptyString(body.Field("created_to"));
+        Pagination = Pagination.Of(body.Field("pagination"));
         SavedCards = Read.List(body.Field("saved_cards"), entry => new SavedCard(entry));
     }
 
@@ -116,6 +117,9 @@ public sealed record SavedCardList
 
     /// <summary>The last day listed, the same way.</summary>
     public string? CreatedTo { get; }
+
+    /// <summary>Where this page stands among every record that matched; the gateway always says it, null only for an answer that leaves it out.</summary>
+    public Pagination? Pagination { get; }
 
     public IReadOnlyList<SavedCard> SavedCards { get; }
 

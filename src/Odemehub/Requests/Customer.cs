@@ -22,7 +22,7 @@ public sealed class Customer
     /// <summary>Where the bill goes: the person and, when they buy for one, the company.</summary>
     public Address? BillingAddress { get; init; }
 
-    /// <summary>Where the goods go.</summary>
+    /// <summary>Where the goods go: the eight person fields only; the gateway turns down a shipping address that carries the company fields (422).</summary>
     public Address? ShippingAddress { get; init; }
 
     internal JsonObject ToBody()

@@ -237,6 +237,61 @@ public sealed class Client
     }
 
     /// <summary>
+    /// The banks whose accounts may be added, each with the credentials it
+    /// asks for.
+    /// </summary>
+    public async Task<BankList> RetrieveBanksAsync(RetrieveBanks banks, CancellationToken cancellationToken = default)
+    {
+        return new BankList(await SendAsync(banks, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Add a bank account whose movements are to be read. The bank is asked
+    /// first: an account it turns the credentials down for is not added, and
+    /// the answer says why rather than throwing.
+    /// </summary>
+    public async Task<BankAccountDetails> CreateBankAccountAsync(CreateBankAccount bankAccount, CancellationToken cancellationToken = default)
+    {
+        return new BankAccountDetails(await SendAsync(bankAccount, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Bank accounts — by token, or every one of the team's — oldest first.
+    /// </summary>
+    public async Task<BankAccountList> RetrieveBankAccountsAsync(RetrieveBankAccounts bankAccounts, CancellationToken cancellationToken = default)
+    {
+        return new BankAccountList(await SendAsync(bankAccounts, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Rename a bank account or replace its credentials. Only what is sent is
+    /// written; new credentials are kept only if the bank lets them read the
+    /// account.
+    /// </summary>
+    public async Task<BankAccountDetails> UpdateBankAccountAsync(UpdateBankAccount bankAccount, CancellationToken cancellationToken = default)
+    {
+        return new BankAccountDetails(await SendAsync(bankAccount, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Remove a bank account and every movement read off it.
+    /// </summary>
+    public async Task<DeletedBankAccount> DeleteBankAccountAsync(DeleteBankAccount bankAccount, CancellationToken cancellationToken = default)
+    {
+        return new DeletedBankAccount(await SendAsync(bankAccount, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// The movements on bank accounts named by their tokens, booked between
+    /// two days, a page at a time, oldest first. They are read from what the
+    /// gateway keeps, which it reads from the bank within the hour.
+    /// </summary>
+    public async Task<BankTransactionList> RetrieveBankTransactionsAsync(RetrieveBankTransactions bankTransactions, CancellationToken cancellationToken = default)
+    {
+        return new BankTransactionList(await SendAsync(bankTransactions, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
     /// Read a word the gateway posted to one of the merchant's webhook
     /// addresses. Hand it the request exactly as it arrived — the method, the
     /// path of the address it came to (without the query string), the raw body

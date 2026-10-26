@@ -28,8 +28,9 @@ public sealed class CreateSubscription : CheckoutMessage
 
     /// <summary>
     /// Where the customer's browser is posted back to once the first renewal
-    /// is paid, with the payment's token. An address reachable from the
-    /// internet.
+    /// is paid, with the payment's token. An https address reachable from the
+    /// internet; on the sandbox any http or https address does, localhost and
+    /// <c>.test</c> names included.
     /// </summary>
     public required string SuccessUrl { get; init; }
 
@@ -95,7 +96,7 @@ public sealed class UpdateSubscription : CheckoutMessage
 
     public string? SuccessUrl { get; init; }
 
-    /// <summary>Sent, they replace every line there was.</summary>
+    /// <summary>Sent, they replace every line there was; at most a hundred.</summary>
     public IReadOnlyList<Item>? Items { get; init; }
 
     public Customer? Customer { get; init; }

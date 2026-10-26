@@ -1,6 +1,6 @@
 # ödemehub .NET SDK
 
-ödemehub ödeme geçidini kendi uygulamanızdan kullanmak için hazırlanmış .NET istemcisi. Kart çekmek, 3D ödeme başlatmak, sipariş, abonelik ve ödeme linki açmak, kart saklamak, iade ve iptal yapmak, taksit sormak: hepsi burada.
+ödemehub ödeme geçidini kendi uygulamanızdan kullanmak için hazırlanmış .NET istemcisi. Kart çekmek, 3D ödeme başlatmak, sipariş, abonelik ve ödeme linki açmak, kart saklamak, iade ve iptal yapmak, taksit sormak, banka hareketlerini okumak: hepsi burada.
 
 İstemci her isteği gizli anahtarınızla imzalar, gelen her yanıtın imzasını doğrular. Siz imza, başlık ya da JSON ayrıntılarıyla uğraşmazsınız. Her uç nokta için bir metot vardır ve adı uç noktanın adıdır: `create-order` için `CreateOrderAsync()`, `retrieve-saved-cards` için `RetrieveSavedCardsAsync()`. Yalnızca .NET'in kendi `HttpClient`'ını ve `System.Text.Json`'ını kullanır; başka paket gerekmez.
 
@@ -13,7 +13,7 @@ Uç noktaların, alanların ve akışların ayrıntılı anlatımı geliştirici
 Paket henüz NuGet'te yayında değildir. SDK'yı kaynağından alıp projenize proje referansıyla ekleyin:
 
 ```bash
-git clone --branch v1.0.5 https://github.com/odemehub/dotnet-sdk.git
+git clone --branch v1.0.6 https://github.com/odemehub/dotnet-sdk.git
 dotnet add <Projeniz>.csproj reference dotnet-sdk/src/Odemehub/Odemehub.csproj
 ```
 
@@ -47,13 +47,13 @@ var client = new Client(new Options
 
 Gizli anahtar hiçbir zaman tel üzerinden gitmez; yalnızca imza üretmekte ve doğrulamakta kullanılır. Anahtarları kodun içine yazmayın; ortam değişkeninde ya da gizli anahtar deposunda tutun.
 
-Geçit hiçbir yerde veritabanı numarası kullanmaz: ödeme hesabı, işlem, sipariş, abonelik, link ve kayıtlı kart her zaman token'ıyla anılır.
+Geçit hiçbir yerde veritabanı numarası kullanmaz: ödeme hesabı, işlem, sipariş, abonelik, link, kayıtlı kart, banka hesabı ve banka hareketi her zaman token'ıyla anılır.
 
 İstemci durum tutmaz; uygulama boyunca tek bir nesneyi paylaşın (ASP.NET Core'da `builder.Services.AddSingleton(client)`). İstek bir dakika içinde yanıt almazsa kesilir; süreyi `Options.Timeout` ile değiştirebilirsiniz. Bütün metotlar `CancellationToken` alır. `IHttpClientFactory`'den aldığınız bir `HttpClient`'ı `new Client(options, httpClient)` ile verebilirsiniz.
 
 İstekler `Odemehub.Requests` ad alanındaki nesnelerdir ve nesne başlatıcıyla kurulur. Zorunlu alanlar `required` işaretlidir; eksik bırakırsanız kod derlenmez. İsteğe bağlı bir alanı vermezseniz gövdeye hiç yazılmaz. SDK alanları kendisi denetlemez; kuralları geçit uygular ve hatayı alan alan `ValidationException` ile döner. Kart numarası ve güvenlik kodu `ToString()` çıktısında `*****` görünür; kart nesnesi yanlışlıkla loglansa da kart bilgisi görünmez.
 
-Yanıtlar `Odemehub.Responses` ad alanındadır ve geçidin JSON'unu birebir yansıtır: `payment.Transaction.Status`, `order.Order.Customer` gibi. Para birimi, dönem ve durumlar `Odemehub.Enums` altındaki enum'lardır (`Currency`, `Period`, `OrderStatus`, `SubscriptionStatus`, `LinkPaymentStatus`, `TransactionStatus`, `PaymentStatus`, `SecurityType`, `RefundType`, `RefundStatus`, `CardScheme`, `CardType`, ödeme linki için `AmountType`, `CurrencyType`, `TaxMode`). Geçit bu sürümün tanımadığı yeni bir değer gönderirse yanıt yine okunur ve değer `Unknown` olur. `Odemehub.Requests` ile `Odemehub.Enums`'u `using` ile ekleyip yanıtları `var` ile karşılamak en rahatıdır.
+Yanıtlar `Odemehub.Responses` ad alanındadır ve geçidin JSON'unu birebir yansıtır: `payment.Transaction.Status`, `order.Order.Customer` gibi. Para birimi, dönem ve durumlar `Odemehub.Enums` altındaki enum'lardır (`Currency`, `Period`, `OrderStatus`, `SubscriptionStatus`, `LinkPaymentStatus`, `TransactionStatus`, `PaymentStatus`, `SecurityType`, `RefundType`, `CardScheme`, `CardType`, ödeme linki için `AmountType`, `CurrencyType`, `TaxMode`). Geçit bu sürümün tanımadığı yeni bir değer gönderirse yanıt yine okunur ve değer `Unknown` olur. `Odemehub.Requests` ile `Odemehub.Enums`'u `using` ile ekleyip yanıtları `var` ile karşılamak en rahatıdır.
 
 ## İmza
 
@@ -146,6 +146,8 @@ if (payment.Result.IsSuccessful)
 
 Başarılı yanıt **ödeme alındı demek değildir**; yalnızca müşterinin gideceği adres hazır demektir. Müşteriyi **15 dakika içinde** bu adrese yönlendirin; sayfası o süre içinde açılmayan ödemenin süresi dolar (`expired`).
 
+`CallbackUrl` (siparişte ve abonelikte `SuccessUrl` ile `CancelUrl` de) canlıda internetten erişilebilen bir `https` adresi olmalıdır; sandbox'ta `localhost` ve `.test` adları dahil her `http`/`https` adresi geçer, yani geliştirirken dönüş adresi olarak localhost kullanabilirsiniz.
+
 Banka işini bitirince müşterinin tarayıcısı `CallbackUrl` adresinize şu alanları POST eder: `transaction_token`, `reference`, `successful` (`1` / `0`). Bu POST imzasızdır ve müşterinin tarayıcısından gelir; yalnızca ipucudur. Sonucu kendi imzalı bağlantınızdan sorun:
 
 ```csharp
@@ -194,7 +196,7 @@ var created = await client.CreateOrderAsync(new CreateOrder
 return Results.Redirect(created.Order.CheckoutUrl!);       // müşteriyi buraya gönderin
 ```
 
-Siparişte müşterinin her parçası isteğe bağlıdır: `Reference`, `BillingAddress`, `ShippingAddress` ya da hiçbiri. Verilenler ödeme sayfasında dolu gelir, kalanı ödeyene sorulur. Referans verilmezse ödeyen müşteri listenize yazılmaz. `SaveAsProduct = true` olan kalem referansıyla ürün listenize yazılır (referans zorunlu); `TaxRate` verilmezse kalem vergisizdir. Gönderim yöntemleri istekte gönderilmez: panelinizdeki **Gönderim Yöntemleri** listesinden ödeyenin adresine uyanlar sunulur.
+Siparişte müşterinin her parçası isteğe bağlıdır: `Reference`, `BillingAddress`, `ShippingAddress` ya da hiçbiri. `ShippingAddress` yalnızca sekiz kişi alanını taşır; firma alanları (`CompanyTitle`, `TaxNumber`, `TaxOffice`) yalnız fatura adresinde gönderilir, gönderim adresinde verilirse geçit 422 döner (abonelikte de böyle). Bir sipariş, abonelik ya da link en çok 100 kalem alır. Verilenler ödeme sayfasında dolu gelir, kalanı ödeyene sorulur. Referans verilmezse ödeyen müşteri listenize yazılmaz. `SaveAsProduct = true` olan kalem referansıyla ürün listenize yazılır (referans zorunlu); `TaxRate` verilmezse kalem vergisizdir. Gönderim yöntemleri istekte gönderilmez: panelinizdeki **Gönderim Yöntemleri** listesinden ödeyenin adresine uyanlar sunulur.
 
 **Müşteri kilidi.** `LocksCustomer = true` gönderilirse ödeme sayfası müşteri bilgisi sormaz; gönderdiğiniz müşteriyi değiştirilemez şekilde gösterir ve ödemeyi onunla alır. Bu durumda fatura adresi eksiksiz olmalıdır; `RequiresShipping = true` ise gönderim adresi de (gönderilmezse fatura adresi kullanılır). Eksik alan varsa geçit `ValidationException` ile reddeder.
 
@@ -247,7 +249,7 @@ detail.Successful;                       // listelenenlerden başarılı olanlar
 await client.UpdatePaymentLinkAsync(new UpdatePaymentLink { Token = link.PaymentLink.Token, IsActive = false });
 ```
 
-Panelden açtığınız linkler de aynı uçlarla bulunur. Linkle ödeyen kişi müşteri listenize yazılmaz ve kartı saklanmaz. Süresi geçmiş bir link yeni bir `ExpiresAt` verilince (ya da son günü `Clear = ["expires_at"]` ile kaldırılınca) yeniden ödeme alır. Her `CreatePaymentLinkAsync` çağrısı yeni bir link açar; dönen token'ı saklayın.
+`UpdatePaymentLinkAsync` değiştirilecek hiçbir alan göndermeden (yalnızca `Token` ile) çağrılırsa geçit 422 döner. Panelden açtığınız linkler de aynı uçlarla bulunur. Linkle ödeyen kişi müşteri listenize yazılmaz ve kartı saklanmaz. Süresi geçmiş bir link yeni bir `ExpiresAt` verilince (ya da son günü `Clear = ["expires_at"]` ile kaldırılınca) yeniden ödeme alır. Her `CreatePaymentLinkAsync` çağrısı yeni bir link açar; dönen token'ı saklayın.
 
 **Tutarı ödeyen seçer.** `AmountType` linkin neyle ödendiğini söyler: `Fixed` (varsayılan) kalemlerle; `Custom` ödeyenin yazdığı tutarla; `Predefined` sizin verdiğiniz tutarlardan biriyle; `PredefinedAndCustom` ikisinden biriyle. Seçimli tiplerde `Items` gönderilmez (gönderilirse yok sayılır); ödeme `ItemName` adlı tek kalem olarak alınır ve `ItemName` zorunludur. Hazır tutarlar `PredefinedAmounts` ile en çok 10 tane verilir. `TaxRate` bu tutarın KDV oranıdır; `TaxMode` `Inclusive` (varsayılan, KDV tutarın içinde) ya da `Exclusive` (KDV tutarın üstüne eklenir) olur.
 
@@ -423,6 +425,64 @@ await client.DeleteSavedCardAsync(new DeleteSavedCard { Token = cardToken });   
 
 Ödemesiz saklamada müşterinin referansı ve fatura adresi eksiksiz gönderilir; Varsayılan Ödeyen açıksa adres eksik olabilir ya da hiç verilmeyebilir, referans yine zorunludur. Güvenlik kodu, kartı küçük bir çekim yapıp geri vererek saklayan sağlayıcılar için gerekir; diğerlerinde boş bırakılabilir ve hiçbir yerde saklanmaz. Kayıtlı kart yanıtlarında kartın yalnızca ilk haneleri ve son dördü vardır.
 
+## Banka hareketleri
+
+Çalışma alanınızın banka hesaplarını geçide ekler, hesaplara giren ve çıkan parayı sorarsınız. Uçlar **Banka Hareketleri** modülünü ister; kapalıysa `ForbiddenException` döner. Hesap yalnızca geçidin verdiği token'la anılır; kimlik bilgileri hiçbir yanıtta dönmez. Eklenebilen bankaları ve her birinin istediği kimlik bilgilerini `RetrieveBanksAsync()` verir.
+
+```csharp
+var banks = await client.RetrieveBanksAsync(new RetrieveBanks());
+banks.Banks[0].Id;                       // "enpara"; CreateBankAccount.Provider
+banks.Banks[0].Fields;                   // Key, Label, IsRequired: Settings'e yazılacak alanlar
+
+var added = await client.CreateBankAccountAsync(new CreateBankAccount
+{
+    Provider = "enpara",
+    Name = "Enpara Vadesiz",
+    Iban = "TR12 0011 1000 0000 0012 3456 78",     // boşluklu ya da boşluksuz
+    Settings = new Dictionary<string, string>
+    {
+        ["client_id"] = clientId,
+        ["client_secret"] = clientSecret,
+        ["access_token"] = accessToken,
+        ["refresh_token"] = refreshToken,
+    },
+});
+added.BankAccount?.Token;                // banka kimlik bilgilerini reddettiyse null, nedeni Result.Message
+
+var accounts = await client.RetrieveBankAccountsAsync(new RetrieveBankAccounts());   // bütün hesaplar; Tokens ile yalnız seçilenler
+accounts.BankAccounts[0].SyncedAt;       // bankadan son okunduğu an; henüz okunmadıysa null
+accounts.BankAccounts[0].LastError;      // son okuma neden olmadı, bankanın sözüyle; olduysa null
+
+await client.UpdateBankAccountAsync(new UpdateBankAccount { Token = accountToken, Name = "Ana hesap" });   // Settings: yalnız değişecek kimlik bilgileri
+await client.DeleteBankAccountAsync(new DeleteBankAccount { Token = accountToken });   // delete-bank-account/{token}
+```
+
+Geçit hesabı eklemeden önce bankaya bağlanıp o IBAN'ı okumayı dener. Banka reddederse hesap eklenmez; bu istisna değildir, `Result.IsSuccessful` false ve `Result.Message` bankanın mesajıyla döner. `UpdateBankAccountAsync`'e `Settings` verildiğinde de aynısı olur: banka reddederse hiçbir şey değişmez. Bankası ve IBAN'ı değişmez; başka bir IBAN yeni bir hesaptır. `UpdateBankAccountAsync` ne `Name` ne `Settings` verilmeden çağrılırsa geçit 422 döner. IBAN boşlukları silinip büyük harfe çevrilerek saklanır ve `TR` ile başlayan 26 karakter olmalıdır; aynı IBAN çalışma alanına ikinci kez eklenemez (ikisinde de 422). Hesap silinince ondan okunan bütün hareketler de silinir. `RetrieveBankAccountsAsync` `Tokens` ile en çok 50 hesap alır; size ait olmayan token boş liste döner.
+
+Hareketler bankadan değil geçidin sakladığı kayıtlardan okunur. Geçit her hesabı saatte bir bankadan çeker, bu yüzden veri en çok bir saat geride olabilir; yeni eklenen hesabın son 7 günü hemen çekilir.
+
+```csharp
+var page = await client.RetrieveBankTransactionsAsync(new RetrieveBankTransactions
+{
+    BankAccountTokens = [accountToken],  // 1–50 hesap
+    CreatedFrom = "2026-10-20",
+    CreatedTo = "2026-10-26",
+    PerPage = 100,                       // en çok 250; Page verilip PerPage verilmezse 50, hiçbiri verilmezse 250
+});
+
+foreach (var movement in page.BankTransactions)
+{
+    // movement.Amount: işaretli; "22164.96" giren, "-40.00" çıkan
+    // movement.BookedAt (bankanın kayıt anı, ISO 8601 UTC), ValueDate, Currency, BalanceAfter
+    // movement.Description, SenderDescription, CounterpartyIban, CounterpartyTaxNumber
+    // movement.BankAccountToken: hangi hesaptan okunduğu
+}
+
+page.Pagination;                         // Page, PerPage, Total, LastPage; sonraki sayfa için Page = page.Pagination.Page + 1
+```
+
+Tarihler hareketin bankadaki tarihidir (`BookedAt`), geçidin okuduğu an değil; `YYYY-MM-DD` biçiminde, çalışma alanının saat dilimindedir, iki uç dahil en çok 7 gündür ve verilmezse son 7 gündür. Yanıttaki `CreatedFrom` / `CreatedTo` kullanılan günleri verir. Hareketler eskiden yeniye gelir; birden çok hesap verilirse bankanın tarihine göre iç içe sıralanır. Banka hareketleri için webhook yoktur; bu uçlar yalnızca dakikada 300 istek sınırına girer.
+
 ## İade ve iptal
 
 Ödemenin token'ı yeter. İade, sağlayıcının kapattığı ödemeden kısmen ya da tamamen; iptal, henüz kapatılmamış ödemenin tamamı.
@@ -537,7 +597,31 @@ foreach (var transaction in list.Payments)
 await client.RetrievePaymentsAsync(new RetrievePayments());   // son 7 gün
 ```
 
-Aynısı `RetrieveOrdersAsync` (`RetrieveOrders`), `RetrieveSubscriptionsAsync` (`RetrieveSubscriptions`), `RetrievePaymentLinksAsync` (`RetrievePaymentLinks`), `RetrieveLinkPaymentsAsync` (`RetrieveLinkPayments`; `Reference` `LINKPAY{n}` biçimindedir) ve `RetrieveSavedCardsAsync` (`RetrieveSavedCards`; `Reference` müşterinin referansıdır) için de geçerlidir. Sipariş ve abonelik listelerinde her kaydın `Customer`'ı da gelir. Referans tekil olmadığından referansla sorgu aynı referanslı bütün kayıtları döner.
+Aynısı `RetrieveOrdersAsync` (`RetrieveOrders`), `RetrieveSubscriptionsAsync` (`RetrieveSubscriptions`), `RetrievePaymentLinksAsync` (`RetrievePaymentLinks`), `RetrieveLinkPaymentsAsync` (`RetrieveLinkPayments`; `Reference` `LINKPAY{n}` biçimindedir) ve `RetrieveSavedCardsAsync` (`RetrieveSavedCards`; `Reference` müşterinin referansıdır) için de geçerlidir. Banka hesapları ve hareketleri bu kalıba uymaz; bkz. [Banka hareketleri](#banka-hareketleri). Sipariş ve abonelik listelerinde her kaydın `Customer`'ı da gelir. Referans tekil olmadığından referansla sorgu aynı referanslı bütün kayıtları döner.
+
+**Sayfa sayfa sorgu.** Yoğun bir çalışma alanında 7 günde binlerce kayıt olabilir; sayfa isteyin. Altı sorgu isteği de (`RetrievePayments`, `RetrieveOrders`, `RetrieveSubscriptions`, `RetrievePaymentLinks`, `RetrieveLinkPayments`, `RetrieveSavedCards`) isteğe bağlı `Page` (1'den başlar) ve `PerPage` (en çok 250) alır ve bunlar öteki süzgeçlerle birlikte verilebilir. Yanıt her zaman sayfalıdır: liste yalnız o sayfanın kayıtlarını taşır ve yanıttaki `Pagination` (`Page`, `PerPage`, `Total`, `LastPage`) sayfanın yerini söyler. `Page` verilip `PerPage` verilmezse sayfa 50 kayıttır; ikisi de verilmezse ilk sayfa 250 kayıtla gelir, fazlası olduğunu `Pagination.Total` gösterir. Sıralama değişmez. Banka hareketleri de aynı kuraldadır; banka hesapları sayfasızdır.
+
+```csharp
+var page = 1;
+PaymentList list;
+
+do
+{
+    list = await client.RetrievePaymentsAsync(new RetrievePayments
+    {
+        CreatedFrom = "2026-09-26",
+        CreatedTo = "2026-10-02",
+        Page = page++,
+        PerPage = 100,
+    });
+
+    foreach (var transaction in list.Payments)
+    {
+        // ...
+    }
+}
+while (list.Pagination!.Page < list.Pagination.LastPage);
+```
 
 ## Hatalar
 
@@ -547,7 +631,7 @@ Bütün hatalar `OdemehubException`'dan türer; tek bir `catch` hepsini yakalar.
 | --- | --- | --- |
 | `AuthenticationException` | 401 | API anahtarı yanlış, imza tutmuyor ya da zaman damgası aralık dışında |
 | `ForbiddenException` | 403 | Çalışma alanı işlem yapamıyor (ödenmemiş bakiye) ya da ucun modülü kapalı; açtırmak için bizimle iletişime geçin |
-| `NotFoundException` | 404 | Güncellenmek, silinmek, iade ya da iptal edilmek istenen kayıt yok (sorgularda boş liste döner) |
+| `NotFoundException` | 404 | Token'la adlanan kaydı güncelleme, silme, iade ya da iptal çağrısında kayıt (sipariş, link, abonelik, kayıtlı kart, banka hesabı, ödeme) yok. Sorgular (`Retrieve*Async`; token, referans ya da tarihle) bulunamayan kaydı 404 değil boş liste olarak döner |
 | `ValidationException` | 422 | Alan hataları; `Errors` noktalı alan adıyla (`transaction.amount`, `order.items.0.name`) |
 | `RateLimitException` | 429 | İstek sınırı; `RetryAfter` saniye |
 | `SignatureException` | — | Yanıtın ya da bildirimin imzası doğrulanamadı; içeriğe güvenmeyin |
@@ -569,7 +653,7 @@ catch (OdemehubException exception)
 }
 ```
 
-Reddedilen ödeme, iade ya da kart saklama istisna değildir; `Result.IsSuccessful` false ve `Result.Message` dolu döner. Ağ hatasında ödemeyi körlemesine tekrarlamayın: `TransportException` "olmadı" demek değil, "bilmiyorum" demektir. Kendi `CancellationToken`'ınızla iptal ettiğiniz istek ise her zamanki gibi `OperationCanceledException` fırlatır.
+Reddedilen ödeme, iade, kart saklama ya da bankanın kimlik bilgilerini reddettiği banka hesabı istisna değildir; `Result.IsSuccessful` false ve `Result.Message` dolu döner. Ağ hatasında ödemeyi körlemesine tekrarlamayın: `TransportException` "olmadı" demek değil, "bilmiyorum" demektir. Kendi `CancellationToken`'ınızla iptal ettiğiniz istek ise her zamanki gibi `OperationCanceledException` fırlatır.
 
 ## İstek sınırları
 
@@ -581,6 +665,24 @@ Sınırlar çalışma alanı başına ve dakikalıktır:
 | 60 istek / dk | `secure-payment`, `regular-payment`, `refund-payment`, `cancel-payment`, `create-saved-card`, `delete-saved-card` (300'e ek olarak) |
 
 Aşıldığında `RateLimitException` döner; `RetryAfter` kadar bekleyip aynı isteği yeniden gönderin.
+
+## 1.0.6'daki değişiklikler
+
+Eklenenler:
+
+- **Banka hareketleri:** `RetrieveBanksAsync()` (`RetrieveBanks`), `CreateBankAccountAsync()` (`CreateBankAccount`), `RetrieveBankAccountsAsync()` (`RetrieveBankAccounts`), `UpdateBankAccountAsync()` (`UpdateBankAccount`), `DeleteBankAccountAsync()` (`DeleteBankAccount`) ve `RetrieveBankTransactionsAsync()` (`RetrieveBankTransactions`). Yeni yanıtlar `BankList` (`Bank`, `BankField`), `BankAccountDetails`, `BankAccountList`, `DeletedBankAccount` (`BankAccount`) ve `BankTransactionList` (`BankTransaction`, `Pagination`). Uçlar **Banka Hareketleri** modülünü ister. Bankanın reddettiği kimlik bilgisi istisna değil, `Result.IsSuccessful` false ile döner. `RetrieveBankTransactionsAsync` sayfalıdır: `Page`, `PerPage` alır, yanıtta `Pagination` gelir.
+- **Sorgularda sayfalama:** `RetrievePayments`, `RetrieveOrders`, `RetrieveSubscriptions`, `RetrievePaymentLinks`, `RetrieveLinkPayments` ve `RetrieveSavedCards` (ortak taban `Retrieve`) isteğe bağlı `Page` ve `PerPage` (en çok 250) alır; verilmezse gövdeye yazılmaz. `PaymentList`, `OrderList`, `SubscriptionList`, `PaymentLinkList`, `LinkPaymentList` ve `SavedCardList` `Pagination` taşır (geçit her zaman gönderir; yanıtta yoksa `null`). `Page` verilip `PerPage` verilmezse sayfa 50 kayıttır, ikisi de verilmezse ilk sayfa 250 kayıtla gelir. **Geçidin davranışı değişti:** sayfa istemeyen sorgu artık bütün kayıtları değil en çok 250 kaydı alır; daha fazlası olabilecek sorgularda `Pagination.Total`'a bakıp sayfa sayfa dolaşın. SDK kodu bu yüzden değişmedi. `PerPage` 250'yi aşarsa geçit 422 döner.
+
+Değişenler:
+
+- **Dönüş adresleri:** `SecurePayment.CallbackUrl`, `CreateOrder` / `CreateSubscription` `SuccessUrl` ve `CancelUrl` açıklamaları geçidin kuralını söyler: canlıda internetten erişilebilen `https` adresi, sandbox'ta `localhost` ve `.test` dahil her `http`/`https` adresi. README'de sandbox'ta localhost kullanılabileceği yazar. `Item.Image` açıklaması `http` ya da `https` adresi der. Kod değişmedi.
+- **404 açıklaması:** `NotFoundException` ve hata tablosu 404'ün yalnızca token'la adlanan güncelleme, silme, iade ve iptal çağrılarında döndüğünü, sorguların bulunamayan kaydı boş liste olarak döndüğünü söyler.
+- **Belgelenen sınırlar:** bir sipariş, abonelik ya da link en çok 100 kalem alır (`UpdateOrder`, `UpdateSubscription`, `UpdatePaymentLink` `Items` açıklamaları da). `UpdatePaymentLinkAsync` ve `UpdateBankAccountAsync` değiştirilecek bir şey gönderilmeden çağrılırsa geçit 422 döner.
+- **Gönderim adresi:** `Customer.ShippingAddress` açıklaması ve README, gönderim adresinin yalnızca sekiz kişi alanını taşıdığını, firma alanlarının 422 ile reddedildiğini söyler. Tip değişmedi.
+
+Kırıcı değişiklik:
+
+- **`RefundStatus` kaldırıldı;** geçit iade durumu döndürmediği için hiçbir yanıtta kullanılmıyordu.
 
 ## 1.0.5'teki değişiklikler
 

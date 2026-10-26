@@ -25,7 +25,7 @@ namespace Odemehub.Requests;
 /// </remarks>
 public abstract class CheckoutMessage : Message
 {
-    /// <summary>Where the customer goes if they turn back without paying; shown as a link on the checkout page.</summary>
+    /// <summary>Where the customer goes if they turn back without paying; shown as a link on the checkout page. An https address reachable from the internet; on the sandbox any http or https address does.</summary>
     public string? CancelUrl { get; init; }
 
     public string? Description { get; init; }

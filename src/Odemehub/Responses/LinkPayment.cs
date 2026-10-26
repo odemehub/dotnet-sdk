@@ -119,6 +119,7 @@ public sealed record LinkPaymentList
         Result = new Result(body);
         CreatedFrom = Read.NonEmptyString(body.Field("created_from"));
         CreatedTo = Read.NonEmptyString(body.Field("created_to"));
+        Pagination = Pagination.Of(body.Field("pagination"));
         LinkPayments = Read.List(body.Field("link_payments"), entry => new LinkPayment(entry));
     }
 
@@ -129,6 +130,9 @@ public sealed record LinkPaymentList
 
     /// <summary>The last day listed, the same way.</summary>
     public string? CreatedTo { get; }
+
+    /// <summary>Where this page stands among every record that matched; the gateway always says it, null only for an answer that leaves it out.</summary>
+    public Pagination? Pagination { get; }
 
     public IReadOnlyList<LinkPayment> LinkPayments { get; }
 }

@@ -173,6 +173,7 @@ public sealed record OrderList
         Result = new Result(body);
         CreatedFrom = Read.NonEmptyString(body.Field("created_from"));
         CreatedTo = Read.NonEmptyString(body.Field("created_to"));
+        Pagination = Pagination.Of(body.Field("pagination"));
         Orders = Read.List(body.Field("orders"), entry => new Order(entry, entry.Field("customer")));
     }
 
@@ -183,6 +184,9 @@ public sealed record OrderList
 
     /// <summary>The last day listed, the same way.</summary>
     public string? CreatedTo { get; }
+
+    /// <summary>Where this page stands among every record that matched; the gateway always says it, null only for an answer that leaves it out.</summary>
+    public Pagination? Pagination { get; }
 
     public IReadOnlyList<Order> Orders { get; }
 }

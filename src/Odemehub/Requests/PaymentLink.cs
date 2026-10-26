@@ -124,14 +124,15 @@ public sealed class CreatePaymentLink : PaymentLinkMessage
 /// <c>IsActive = false</c>; one that ran out takes payments again once it is
 /// given a new <see cref="PaymentLinkMessage.ExpiresAt"/>, or none. A payment
 /// under way does not stand in the way: the payments to come are charged as
-/// the link now is.
+/// the link now is. A change that sends nothing to change is turned down
+/// (422).
 /// </summary>
 public sealed class UpdatePaymentLink : PaymentLinkMessage
 {
     /// <summary>The link's token in the gateway.</summary>
     public required string Token { get; init; }
 
-    /// <summary>Sent, they replace every line there was.</summary>
+    /// <summary>Sent, they replace every line there was; at most a hundred.</summary>
     public IReadOnlyList<Item>? Items { get; init; }
 
     public Currency? Currency { get; init; }

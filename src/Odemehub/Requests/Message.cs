@@ -67,6 +67,12 @@ public abstract class Retrieve : Message
     /// <summary>The last day, as <c>YYYY-MM-DD</c>, at most six days after the first.</summary>
     public string? CreatedTo { get; init; }
 
+    /// <summary>The page, from 1. Left out, the first. The answer always comes a page at a time and says where the page stands.</summary>
+    public int? Page { get; init; }
+
+    /// <summary>How many records a page holds, at most 250. Left out, 50 when <see cref="Page"/> is given and 250 when neither is.</summary>
+    public int? PerPage { get; init; }
+
     /// <summary>The field the merchant's own reference travels in.</summary>
     internal virtual string ReferenceField => "reference";
 
@@ -76,6 +82,8 @@ public abstract class Retrieve : Message
             ("token", Token),
             (ReferenceField, Reference),
             ("created_from", CreatedFrom),
-            ("created_to", CreatedTo));
+            ("created_to", CreatedTo),
+            ("page", Page),
+            ("per_page", PerPage));
     }
 }
