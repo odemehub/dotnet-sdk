@@ -28,6 +28,7 @@ public sealed record Subscription
         RequiresShipping = Read.Bool(subscription.Field("requires_shipping"));
         LocksCustomer = Read.Bool(subscription.Field("locks_customer"));
         EmailsCustomer = Read.Bool(subscription.Field("emails_customer"));
+        MaxInstallments = MaxInstallments.Of(subscription.Field("max_installments"));
         Period = Read.Enum<Period>(subscription.Field("period"));
         RenewalLimit = Read.OptionalInt(subscription.Field("renewal_limit"));
         RenewalsPaid = Read.Int(subscription.Field("renewals_paid"));
@@ -71,6 +72,9 @@ public sealed record Subscription
 
     /// <summary>Whether the customer is sent an e-mail at their billing address.</summary>
     public bool EmailsCustomer { get; }
+
+    /// <summary>The most installments the payer is offered on the checkout page; null when there is no limit.</summary>
+    public MaxInstallments? MaxInstallments { get; }
 
     /// <summary>How often a renewal comes round.</summary>
     public Period Period { get; }

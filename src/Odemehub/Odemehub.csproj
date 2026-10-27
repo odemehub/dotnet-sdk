@@ -11,7 +11,7 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
 
     <PackageId>Odemehub.Sdk</PackageId>
-    <Version>1.0.6</Version>
+    <Version>1.0.7</Version>
     <Description>ödemehub ödeme geçidi için .NET istemcisi.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageProjectUrl>https://dev.odemehub.com/</PackageProjectUrl>

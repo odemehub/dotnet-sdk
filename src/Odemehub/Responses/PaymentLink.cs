@@ -32,6 +32,7 @@ public sealed record PaymentLink
         CurrencyType = Read.Enum<CurrencyType>(link.Field("currency_type"));
         Currencies = Read.OptionalList(link.Field("currencies"), Read.Enum<Currency>);
         EmailsCustomer = Read.Bool(link.Field("emails_customer"));
+        MaxInstallments = MaxInstallments.Of(link.Field("max_installments"));
         IsActive = Read.Bool(link.Field("is_active"));
         IsTest = Read.Bool(link.Field("is_test"));
         ExpiresAt = Read.NonEmptyString(link.Field("expires_at"));
@@ -91,6 +92,9 @@ public sealed record PaymentLink
 
     /// <summary>Whether the payer is sent an e-mail, at the address they give on the checkout page, once their payment goes through.</summary>
     public bool EmailsCustomer { get; }
+
+    /// <summary>The most installments the payer is offered on the checkout page; null when there is no limit.</summary>
+    public MaxInstallments? MaxInstallments { get; }
 
     /// <summary>Whether it takes payments now: switched on and its last day not gone by.</summary>
     public bool IsActive { get; }

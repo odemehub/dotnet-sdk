@@ -62,6 +62,14 @@ public abstract class CheckoutMessage : Message
     /// </summary>
     public bool? EmailsCustomer { get; init; }
 
+    /// <summary>
+    /// The most installments the payer is offered on the checkout page, for
+    /// cards issued to people and to companies. Left out of a new one, there
+    /// is no limit; sent on a change, it takes the place of the limits there
+    /// were, and one with neither number set lifts them.
+    /// </summary>
+    public MaxInstallments? MaxInstallments { get; init; }
+
 
     /// <summary>
     /// The group's fields, with what the caller left unsaid left out.
@@ -81,6 +89,7 @@ public abstract class CheckoutMessage : Message
             ("requires_shipping", RequiresShipping),
             ("locks_customer", LocksCustomer),
             ("emails_customer", EmailsCustomer),
+            ("max_installments", MaxInstallments?.ToBody()),
             ("items", Item.ToBody(items)));
     }
 

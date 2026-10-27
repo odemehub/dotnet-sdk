@@ -34,6 +34,7 @@ public sealed record Order
         RequiresShipping = Read.Bool(order.Field("requires_shipping"));
         LocksCustomer = Read.Bool(order.Field("locks_customer"));
         EmailsCustomer = Read.Bool(order.Field("emails_customer"));
+        MaxInstallments = MaxInstallments.Of(order.Field("max_installments"));
         Items = Read.List(order.Field("items"), item => new Item(item));
         ShippingMethod = shippingMethod.ValueKind == JsonValueKind.Object ? new ShippingMethod(shippingMethod) : null;
         Discount = Discount.Of(order.Field("discount"));
@@ -72,6 +73,9 @@ public sealed record Order
 
     /// <summary>Whether the customer is sent an e-mail at their billing address.</summary>
     public bool EmailsCustomer { get; }
+
+    /// <summary>The most installments the payer is offered on the checkout page; null when there is no limit.</summary>
+    public MaxInstallments? MaxInstallments { get; }
 
     /// <summary>What the order is made up of.</summary>
     public IReadOnlyList<Item> Items { get; }

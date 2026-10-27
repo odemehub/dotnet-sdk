@@ -13,7 +13,7 @@ Uç noktaların, alanların ve akışların ayrıntılı anlatımı geliştirici
 Paket henüz NuGet'te yayında değildir. SDK'yı kaynağından alıp projenize proje referansıyla ekleyin:
 
 ```bash
-git clone --branch v1.0.6 https://github.com/odemehub/dotnet-sdk.git
+git clone --branch v1.0.7 https://github.com/odemehub/dotnet-sdk.git
 dotnet add <Projeniz>.csproj reference dotnet-sdk/src/Odemehub/Odemehub.csproj
 ```
 
@@ -200,7 +200,15 @@ Siparişte müşterinin her parçası isteğe bağlıdır: `Reference`, `Billing
 
 **Müşteri kilidi.** `LocksCustomer = true` gönderilirse ödeme sayfası müşteri bilgisi sormaz; gönderdiğiniz müşteriyi değiştirilemez şekilde gösterir ve ödemeyi onunla alır. Bu durumda fatura adresi eksiksiz olmalıdır; `RequiresShipping = true` ise gönderim adresi de (gönderilmezse fatura adresi kullanılır). Eksik alan varsa geçit `ValidationException` ile reddeder.
 
-Yanıttaki `Order` siparişi bütünüyle taşır: `Token`, `Reference`, `Description`, `PaymentProviderToken`, `Status` (`OrderStatus.Open` / `Paid`), `RequiresShipping`, `LocksCustomer`, `EmailsCustomer`, `Items`, `ShippingMethod` (ödeyenin seçtiği), `Discount`, `Subtotal`, `ShippingAmount`, `TaxAmount`, `Amount`, `Currency`, `IsTest`, `CreatedAt`, `CheckoutUrl` (ödenince `null`), `Transaction` (ödeyen işlem; açıkken `null`) ve `Customer`. Müşteri yanıtın üst seviyesinde de durur: `created.Customer` ile `created.Order.Customer` aynıdır; listelerde her siparişin kendi `Customer`'ı vardır.
+**Taksit sınırı.** `MaxInstallments` ödeme sayfasında sunulan en fazla taksiti bireysel ve ticari kart için ayrı ayrı sınırlar: her biri 1–12, 1 yalnız tek çekim, `null` o kart tipinde sınır yok. Verilmezse sınır yoktur. Aynı alan `CreateSubscription` / `UpdateSubscription` ve `CreatePaymentLink` / `UpdatePaymentLink`'te de vardır.
+
+```csharp
+MaxInstallments = new MaxInstallments { Individual = 6, Commercial = 1 },   // bireysel kartta en fazla 6 taksit, ticari kartta tek çekim
+```
+
+Güncellemede (`UpdateOrder`, `UpdateSubscription`, `UpdatePaymentLink`) gönderilen sınır eskisinin yerine geçer, gönderilmezse eskisi kalır; iki değeri de boş `new MaxInstallments()` (`{"individual": null, "commercial": null}`) sınırı kaldırır. Yanıtta `MaxInstallments` (`Individual`, `Commercial`) döner, sınır yoksa `null`'dır.
+
+Yanıttaki `Order` siparişi bütünüyle taşır: `Token`, `Reference`, `Description`, `PaymentProviderToken`, `Status` (`OrderStatus.Open` / `Paid`), `RequiresShipping`, `LocksCustomer`, `EmailsCustomer`, `MaxInstallments` (taksit sınırı, yoksa `null`), `Items`, `ShippingMethod` (ödeyenin seçtiği), `Discount`, `Subtotal`, `ShippingAmount`, `TaxAmount`, `Amount`, `Currency`, `IsTest`, `CreatedAt`, `CheckoutUrl` (ödenince `null`), `Transaction` (ödeyen işlem; açıkken `null`) ve `Customer`. Müşteri yanıtın üst seviyesinde de durur: `created.Customer` ile `created.Order.Customer` aynıdır; listelerde her siparişin kendi `Customer`'ı vardır.
 
 **İndirim.** Kupon API'den gönderilmez; ödeyen kodu ödeme sayfasında girer. Kupon kullanıldıysa `Order.Discount` kodu (`Code`) ve kalemlerden düşülen tutarı (`Amount`) taşır, kullanılmadıysa `null`'dır. Siparişin `Subtotal`, `TaxAmount` ve `Amount` değerleri indirim düşülmüş hâlidir; kupon gönderim ücretinden düşülmez.
 
@@ -279,7 +287,7 @@ await client.UpdatePaymentLinkAsync(new UpdatePaymentLink
 });
 ```
 
-Yanıttaki `PaymentLink` gönderilen alanların hepsini taşır: `AmountType`, `ItemName`, `PredefinedAmounts`, `TaxRate`, `TaxMode`, `CurrencyType`, `Currencies`, `EmailsCustomer`. Tipin kullanmadığı alanlar geçitte boşaltılır (`null` döner). Güncellemede `Clear` `expires_at`, `description`, `payment_provider_token`, `item_name`, `predefined_amounts`, `tax_rate` ve `currencies` alanlarını boşaltabilir.
+Yanıttaki `PaymentLink` gönderilen alanların hepsini taşır: `AmountType`, `ItemName`, `PredefinedAmounts`, `TaxRate`, `TaxMode`, `CurrencyType`, `Currencies`, `EmailsCustomer`, `MaxInstallments` (taksit sınırı, yoksa `null`; bkz. [Sipariş](#sipariş)). Tipin kullanmadığı alanlar geçitte boşaltılır (`null` döner). Güncellemede `Clear` `expires_at`, `description`, `payment_provider_token`, `item_name`, `predefined_amounts`, `tax_rate` ve `currencies` alanlarını boşaltabilir.
 
 **Link ödemeleri.** Bir ödeyenin linki bir kez ödemesi bir link ödemesidir (`LinkPayment`); ödeyen ödemeye başlayınca açılır, bankası reddettikçe `LinkPaymentStatus.Open` kalır, ödeme geçince `Paid` olur. Referansı `LINKPAY{n}` biçimindedir ve link ödemesinin denemeleri de bu referansla görünür. Kimin ne ödediğini `RetrieveLinkPaymentsAsync()` verir:
 
@@ -335,7 +343,7 @@ await client.UpdateSubscriptionAsync(new UpdateSubscription { Token = token, Sta
 
 Kalemler gönderilirse ödenmemiş yenilemeye ve sonrakilere yansır. İptalde para iade edilmez; ödenmiş dönem sonuna kadar sürer, sonra abonelik biter. Ödenmiş dönem yoksa iptal hemen geçerlidir. `RenewalLimit` şimdiye kadar ödenen yenilemelerin altına inemez; sınırı kaldırmak için `Clear = ["renewal_limit"]`.
 
-`LocksCustomer` siparişteki gibi çalışır; yanıt da siparişteki gibi `RequiresShipping`, `LocksCustomer` ve `EmailsCustomer` taşır. `EmailsCustomer` açıkken dönem ödemesi alınamazsa ödeme sayfasının bağlantısı doğrudan müşteriye gider, size ayrıca e-posta gelmez.
+`LocksCustomer` siparişteki gibi çalışır; yanıt da siparişteki gibi `RequiresShipping`, `LocksCustomer` ve `EmailsCustomer` taşır. Taksit sınırı (`MaxInstallments`) da siparişteki gibidir. `EmailsCustomer` açıkken dönem ödemesi alınamazsa ödeme sayfasının bağlantısı doğrudan müşteriye gider, size ayrıca e-posta gelmez.
 
 İlk ödemeden sonra yalnızca iptal (`Status`), ödeme sayısı (`RenewalLimit`), dönem (`Period`) ve aynı kalemlerin birim fiyatı değişebilir; müşteri dahil başka bir alan gönderilirse geçit 422 ile reddeder.
 
@@ -665,6 +673,12 @@ Sınırlar çalışma alanı başına ve dakikalıktır:
 | 60 istek / dk | `secure-payment`, `regular-payment`, `refund-payment`, `cancel-payment`, `create-saved-card`, `delete-saved-card` (300'e ek olarak) |
 
 Aşıldığında `RateLimitException` döner; `RetryAfter` kadar bekleyip aynı isteği yeniden gönderin.
+
+## 1.0.7'deki değişiklikler
+
+Eklenenler:
+
+- **Taksit sınırı:** `MaxInstallments` (`Individual`, `Commercial`); sipariş, abonelik ve ödeme linki isteklerinde `MaxInstallments` özelliği; `Order`, `Subscription` ve `PaymentLink` yanıtlarında `MaxInstallments` (yoksa `null`). Güncellemede `new MaxInstallments()` sınırı kaldırır.
 
 ## 1.0.6'daki değişiklikler
 

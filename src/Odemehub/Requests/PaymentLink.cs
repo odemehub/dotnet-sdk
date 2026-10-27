@@ -53,6 +53,14 @@ public abstract class PaymentLinkMessage : Message
     /// <summary>Whether the payer is sent an e-mail, at the address they give on the checkout page, once their payment goes through. Left out on a new link, they are not.</summary>
     public bool? EmailsCustomer { get; init; }
 
+    /// <summary>
+    /// The most installments the payer is offered on the link's checkout page,
+    /// for cards issued to people and to companies. Left out of a new link,
+    /// there is no limit; sent on a change, it takes the place of the limits
+    /// there were, and one with neither number set lifts them.
+    /// </summary>
+    public MaxInstallments? MaxInstallments { get; init; }
+
     /// <summary>The last day the link may be paid, as <c>YYYY-MM-DD</c> in the team's timezone; today or later. Left out on a new link, it never runs out.</summary>
     public string? ExpiresAt { get; init; }
 
@@ -80,6 +88,7 @@ public abstract class PaymentLinkMessage : Message
             ("currency_type", Wire.Of(CurrencyType)),
             ("currencies", Fields.List(Currencies?.Select(money => Wire.Of<Currency>(money)))),
             ("emails_customer", EmailsCustomer),
+            ("max_installments", MaxInstallments?.ToBody()),
             ("expires_at", ExpiresAt),
             ("is_active", IsActive),
             ("items", Item.ToBody(items)));
